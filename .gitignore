@@ -1,3 +1,16 @@
+input/*.log
+input/*.zip
+jar/
+report/*.html
+report/*.zip
+report/*.png
+resources/*.csv
+resources/*.xlsx
+resources/others/
+resources/mandatory/paths.csv
+test/
+.ipynb_checkpoints/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
