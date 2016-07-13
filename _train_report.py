@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -20,7 +20,7 @@
 report = ''
 FOLDER = 'resources/'
 REPORT_FOLDER = 'report/'
-PRINT = True
+PRINT = False
 
 
 # In[369]:
@@ -83,7 +83,7 @@ from ast import literal_eval
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 plt.style.use('fivethirtyeight')
 plt.rc('font', family='Tahoma')
 
@@ -435,7 +435,7 @@ res.columns = ['Тип', 'Из всех поездов', 'Из всех с по�
 add_header('Количество коллизий (интервал между поездами меньше %d минут):' % (min_time_delta / 60))
 add_line(res)
 add_header('\nРеальные и фейковые поезда с интервалами меньше %d минут (первые 20):' % (min_time_delta / 60))
-add_line(no_res_assign_coll[cols].head(20))
+add_line(no_res_coll[cols].head(20))
 
 
 # <a id='ssp'></a>

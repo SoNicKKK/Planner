@@ -271,7 +271,7 @@ pd.set_option('display.max_colwidth', 60)
 #reg_st.ix[2002119307].reg_name
 
 
-# In[12]:
+# In[14]:
 
 def save_to_excel(df, filename=FOLDER + 'reg_ser.xlsx'):    
     df.to_excel(filename)
@@ -292,6 +292,10 @@ loco_info_regs['ser_desc'] = loco_info_regs.ser_name.map(loco_series.drop_duplic
 a = loco_info_regs.loc[(loco_info_regs.ltype == 1) & (loco_info_regs.ser_desc.isin(['Грузовое', 'Грузопассажирское']))]            .groupby(['region', 'reg_name_str']).ser_name.unique().to_frame()
 b = loco_info_regs.loc[(loco_info_regs.ltype == 1) & (loco_info_regs.ser_desc.isin(['Грузовое', 'Грузопассажирское']))]            .groupby(['region', 'reg_name_str']).ser_type.unique().to_frame()
 c = a.join(b)
+print(loco_info.head())
+print(a.head())
+print(b.head())
+print(c.head())
 d = c.join(loco_info_regs.loc[loco_info_regs.ltype == 1].groupby(['region', 'reg_name_str']).loco.count())
 #print('Total locos:', loco_info.loco.drop_duplicates().count())
 #print('Freight locos:', loco_info.loc[loco_info.ser_desc.isin(['Грузовое', 'Грузопассажирское'])].loco.drop_duplicates().count())
@@ -301,7 +305,7 @@ add_line(d.reset_index().sort_values('loco', ascending=False))
 #save_to_excel(d)
 
 
-# In[13]:
+# In[ ]:
 
 reg_ser = d.reset_index()[['region', 'ser_type']]
 
@@ -309,14 +313,14 @@ reg_ser = d.reset_index()[['region', 'ser_type']]
 # <a id='correct_reg_plan'></a>
 # ### Проверка выезда локомотивов за пределы своих тяговых плеч [ToC](#toc)
 
-# In[14]:
+# In[ ]:
 
 add_header('Проверка выезда локомотивов за пределы своих тяговых плеч', h=3, p=False)
 
 
 # #### Добавляем тяговое плечо в таблицу линков
 
-# In[15]:
+# In[ ]:
 
 stations['regions'] = stations.station.map(stations.groupby('station').loco_region.unique())
 stations_unique = stations.drop_duplicates('station').set_index('station')
@@ -335,8 +339,13 @@ links['reg_name'] = links.regs.apply(lambda x: regs[regs.loco_region.isin(x)].sh
 loco_plan['curr_reg'] = loco_plan.link.map(links.drop_duplicates('link').set_index('link').regs)
 loco_plan['curr_reg_name'] = loco_plan.link.map(links.drop_duplicates('link').set_index('link').reg_name)
 loco_plan['regions'] = loco_plan.loco.map(loco_info.set_index('loco').regions_eval)
-loco_info['reg_names'] = loco_info.regions_eval.apply(lambda x:                                                       regs[regs.loco_region.isin([int(i) for i in x])].short_name.values)
+loco_info['reg_names'] = loco_info.regions_eval.apply(lambda x:                                                 regs[regs.loco_region.isin([int(i) for i in x if i != ''])].short_name.values)
 loco_plan['reg_names'] = loco_plan.loco.map(loco_info.set_index('loco').reg_names)
+
+
+# In[ ]:
+
+loco_info[loco_info.regions.apply(lambda x: len(x) < 5)][['loco', 'number', 'regions', 'regions_eval']]
 
 
 # #### Вычисляем, есть у локомотива текущее тяговое плечо в списке разрешенных

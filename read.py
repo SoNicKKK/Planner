@@ -1,4 +1,4 @@
-﻿
+
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -44,7 +44,7 @@
 # 6. [Выгрузка результатов в csv-файлы](#save_csv)
 #   1. [Создание вспомогательного файла с названиями серий](#series)
 
-# In[159]:
+# In[77]:
 
 import sys
 if len(sys.argv) > 1:
@@ -58,21 +58,69 @@ else:
 print('Load data from file "%s"' % file_name)
 
 
-# In[160]:
+# In[78]:
 
 import pandas as pd
 import numpy as np
 import re, time
 
 
-# In[161]:
+# In[79]:
 
 start_time = time.time()
 FOLDER = 'resources/'
 
 
-# In[162]:
+# In[80]:
 
+# def log_progress(sequence, every=None, size=None):
+#     from ipywidgets import IntProgress, HTML, VBox
+#     from IPython.display import display
+
+#     is_iterator = False
+#     if size is None:
+#         try:
+#             size = len(sequence)
+#         except TypeError:
+#             is_iterator = True
+#     if size is not None:
+#         if every is None:
+#             if size <= 200:
+#                 every = 1
+#             else:
+#                 every = size / 200     # every 0.5%
+#     else:
+#         assert every is not None, 'sequence is iterator, set every'
+
+#     if is_iterator:
+#         progress = IntProgress(min=0, max=1, value=1)
+#         progress.bar_style = 'info'
+#     else:
+#         progress = IntProgress(min=0, max=size, value=0)
+#     label = HTML()
+#     box = VBox(children=[label, progress])
+#     display(box)
+
+#     index = 0
+#     try:
+#         for index, record in enumerate(sequence, 1):
+#             if index == 1 or index % every == 0:
+#                 if is_iterator:
+#                     label.value = '{index} / ?'.format(index=index)
+#                 else:
+#                     progress.value = index
+#                     label.value = u'{index} / {size}'.format(
+#                         index=index,
+#                         size=size
+#                     )
+#             yield record
+#     except:
+#         progress.bar_style = 'danger'
+#         raise
+#     else:
+#         progress.bar_style = 'success'
+#         progress.value = index
+#         label.value = str(index or '?')
 
 
 # <a id='dict'></a>
@@ -81,7 +129,7 @@ FOLDER = 'resources/'
 # <a id='cols'></a>
 # ### Поля сущностей [ToC](#toc)
 
-# In[163]:
+# In[81]:
 
 entities_cols = {  'link'                  :['link', 'st_from', 'st_to', 'time', 'dist', 'dir', 'lines', 'road'],
                    'station'               :['station', 'loco_region','norm_time'],
@@ -94,7 +142,7 @@ entities_cols = {  'link'                  :['link', 'st_from', 'st_to', 'time',
                    'task'                  :['id', 'time_start', 'time_end', 'st_from', 'st_next', 'st_to', 'number'],
                    'train_info'            :['train', 'number', 'weight', 'length', 'start_st', 'end_st', 'joint'],
                    'slot_train'            :['train', 'st_from', 'st_to', 'link', 'time_start', 'time_end'],
-                   'loco_attributes'       :['loco', 'series', 'regions', 'depot', 'sections', 'ltype'],
+                   'loco_attributes'       :['loco', 'series', 'regions', 'depot', 'sections', 'ltype', 'power_type'],
                    'slot_loco'             :['loco', 'st_from', 'st_to', 'link', 'time_start', 'time_end', 'state', 'train'],
                    'team_attributes'       :['team', 'regions', 'depot', 'long', 'heavy', 'series', 'fake', 'ttype'],
                    'fact_team_ready'       :['team', 'ready_type', 'depot_st', 'depot_time', 
@@ -123,7 +171,7 @@ entities_cols = {  'link'                  :['link', 'st_from', 'st_to', 'time',
 # <a id='data'></a>
 # ### Словари для строк из файла, списков с данными и датафреймов [ToC](#toc)
 
-# In[164]:
+# In[82]:
 
 entities_data = {}
 for key in entities_cols.keys():
@@ -141,7 +189,7 @@ for key in entities_cols.keys():
 # <a id='read'></a>
 # ## Загрузка строк из файла [ToC](#toc)
 
-# In[165]:
+# In[83]:
 
 def simplecount(filename):
     lines = 0
@@ -152,9 +200,10 @@ def simplecount(filename):
 n = simplecount(file_name)
 
 
-# In[166]:
+# In[84]:
 
 with open(file_name, encoding = 'utf_8_sig') as f:    
+    #for line in log_progress(f, every = 1000, size=n):
     for line in f:
         functor = line[1:line.find("(")]
         functor_tell = line[5:line.find("(", 5)]
@@ -177,7 +226,7 @@ print(sorted((key, len(entities_data[key])) for key in entities_cols.keys()))
 # <a id='train_info'></a>
 # #### Атрибуты и маршруты поездов [ToC](#toc)
 
-# In[167]:
+# In[85]:
 
 entities_df_source['train_info'] = []
 entities_df_source['routes'] = []
@@ -206,7 +255,7 @@ for line in entities_data['train_info']:
 # <a id='train_oper'></a>
 # #### Операции с поездами (поездные факты) [ToC](#toc)
 
-# In[168]:
+# In[86]:
 
 entities_df_source['train_oper'] = []
 
@@ -234,7 +283,7 @@ for line in entities_data['train_ready']:
 # <a id='loco_attributes'></a>
 # #### Атрибуты локомотивов и тяговые плечи [ToC](#toc)
 
-# In[169]:
+# In[87]:
 
 entities_df_source['loco_attributes'] = []
 entities_df_source['loco_info_regs'] = []
@@ -251,19 +300,20 @@ for line in entities_data['loco_attributes']:
     rest_line = line[line.find('depot'):].split(',')
     depot = rest_line[0][14:-2]            
     sections = rest_line[1][9:-1]
-    if len(rest_line) > 2:
-        ltype = rest_line[2][5:-5]
+    ltype = rest_line[2][5:-1]
+    if len(rest_line) > 3:
+        power_type = rest_line[3][11:-5]
     else:
-        ltype = 'none'
-    entities_df_source['loco_attributes'].append([loco, series, regions, depot, sections, ltype])
+        power_type = 'none'
+    entities_df_source['loco_attributes'].append([loco, series, regions, depot, sections, ltype, power_type])
     
-#entities_df_source['loco_attributes'][:3]
+entities_df_source['loco_attributes'][:3]
 
 
 # <a id='fact_loco'></a>
 # #### Местоположение локомотивов (локомотивные факты) [ToC](#toc)
 
-# In[170]:
+# In[88]:
 
 entities_df_source['fact_loco'] = []
 
@@ -289,7 +339,7 @@ for line in entities_data['fact_loco']:
 # <a id='fact_loco_next_service'></a>
 # #### Время и пробег до ТО-2 [ToC](#toc)
 
-# In[171]:
+# In[89]:
 
 entities_df_source['fact_loco_next_service'] = []
 
@@ -307,7 +357,7 @@ for line in entities_data['fact_loco_next_service']:
 # <a id='team_attributes'></a>
 # #### Атрибуты бригад [ToC](#toc)
 
-# In[172]:
+# In[90]:
 
 entities_df_source['team_attributes'] = []
 a = []
@@ -333,7 +383,7 @@ for line in entities_data['team_attributes']:
 # <a id='fact_team_location'></a>
 # #### Местоположение и состояние бригад [ToC](#toc)
 
-# In[173]:
+# In[91]:
 
 entities_df_source['fact_team_location'] = []
 
@@ -355,7 +405,7 @@ for line in entities_data['fact_team_location']:
 # <a id='fact_team_ready'></a>
 # #### Последние явки и время начала отдыха бригад [ToC](#toc)
 
-# In[174]:
+# In[92]:
 
 entities_df_source['fact_team_ready'] = []
 
@@ -377,7 +427,7 @@ for line in entities_data['fact_team_ready']:
 # <a id='station'></a>
 # #### Станции и пункты проведения ТО [ToC](#toc)
 
-# In[175]:
+# In[93]:
 
 entities_df_source['station'] = []
 entities_df_source['service'] = []
@@ -401,7 +451,7 @@ for line in entities_data['station']:
 # <a id='link'></a>
 # #### Участки планирования [ToC](#toc)
 
-# In[176]:
+# In[94]:
 
 entities_df_source['link'] = []
 
@@ -419,7 +469,7 @@ for line in entities_data['link']:
 # <a id='team_region'></a>
 # #### Участки обращения бригад (УОЛБ) [ToC](#toc)
 
-# In[177]:
+# In[95]:
 
 entities_df_source['team_region'] = []
 
@@ -445,7 +495,7 @@ for line in entities_data['team_region']:
 # <a id='team_work_region'></a>
 # #### Участки обкатки бригад [ToC](#toc)
 
-# In[178]:
+# In[96]:
 
 entities_df_source['team_work_region'] = []
 
@@ -464,7 +514,7 @@ for line in entities_data['team_work_region']:
 # <a id='loco_tonnage'></a>
 # #### Весовые нормы локомотивов [ToC](#toc)
 
-# In[179]:
+# In[97]:
 
 entities_df_source['loco_tonnage'] = []
 
@@ -484,7 +534,7 @@ for line in entities_data['loco_tonnage']:
 # <a id='task'></a>
 # #### Задания на поезда своего формирования из ССП [ToC](#toc)
 
-# In[180]:
+# In[98]:
 
 entities_df_source['task'] = []
 
@@ -511,7 +561,7 @@ for line in entities_data['task']:
 # <a id='slot_pass'></a>
 # #### Пассажирские нитки вариантного графика [ToC](#toc)
 
-# In[181]:
+# In[99]:
 
 entities_df_source['slot_pass'] = []
 
@@ -530,7 +580,7 @@ for line in entities_data['slot_pass']:
 # <a id='slot'></a>
 # #### Грузовые нитки вариантного графика [ToC](#toc)
 
-# In[182]:
+# In[100]:
 
 entities_df_source['slot'] = []
 
@@ -549,7 +599,7 @@ for line in entities_data['slot']:
 # <a id='service_station'></a>
 # #### Станции ПТОЛ [ToC](#toc)
 
-# In[183]:
+# In[101]:
 
 entities_df_source['service_station'] = []
 
@@ -570,7 +620,7 @@ for line in entities_data['service_station']:
 # <a id='support'></a>
 # #### Вспомогательная информация (индексы поездов, номера локомотивов, бригад, названия и коды станций [ToC](#toc)
 
-# In[184]:
+# In[102]:
 
 entities_df_source['support'] = []
 
@@ -611,7 +661,7 @@ for line in entities_data['support']:
 # <a id='current_time'></a>
 # #### Время начала планирования [ToC](#toc)
 
-# In[185]:
+# In[103]:
 
 entities_df_source['current_time'] = []
 for line in entities_data['current_time']:
@@ -627,7 +677,7 @@ for line in entities_data['current_time']:
 # <a id='slot_train'></a>
 # #### Планы по поездам [ToC](#toc)
 
-# In[186]:
+# In[104]:
 
 entities_df_source['slot_train'] = []
 
@@ -646,7 +696,7 @@ for line in entities_data['slot_train']:
 # <a id='slot_loco'></a>
 # #### Планы по локомотивам [ToC](#toc)
 
-# In[187]:
+# In[105]:
 
 entities_df_source['slot_loco'] = []
 
@@ -666,7 +716,7 @@ for line in entities_data['slot_loco']:
 # <a id='slot_team'></a>
 # #### Планы по бригадам [ToC](#toc)
 
-# In[188]:
+# In[106]:
 
 entities_df_source['slot_team'] = []
 
@@ -687,7 +737,7 @@ for line in entities_data['slot_team']:
 # <a id='create_df'></a>
 # ## Создание датафреймов [ToC](#toc)
 
-# In[189]:
+# In[107]:
 
 for key in entities_df.keys():
     try:
@@ -704,7 +754,7 @@ for key in entities_df.keys():
 # <a id='merge_station'></a>
 # #### Добавление кодов и названий станций в station [ToC](#toc)
 
-# In[190]:
+# In[108]:
 
 for col in entities_cols['station_names']:
     if col != 'station':
@@ -714,7 +764,7 @@ for col in entities_cols['station_names']:
 # <a id='merge_train'></a>
 # #### Добавление индекса и операций с поездами в train_info [ToC](#toc)
 
-# In[191]:
+# In[109]:
 
 # Если по поезду в train_oper несколько операций, то оставляем только последнюю по времени
 # Если последних операций тоже несколько, то оставляем в таком порядке: сначала depart - потом ready - потом arrive
@@ -732,7 +782,7 @@ entities_df['train_oper'].sort_values(['train', 'oper_time', 'oper_code'])
 entities_df['train_oper'] = entities_df['train_oper'].sort_values(['train', 'oper_time', 'oper_code'])                                                     .drop_duplicates(subset=['train'], keep='last')                                                     .drop('oper_code', axis=1)
 
 
-# In[42]:
+# In[110]:
 
 if 'ind434' not in entities_df['train_info'].columns:
     entities_df['train_info'] = entities_df['train_info'].set_index('train')                                .join(entities_df['train_index'].set_index('train')).reset_index()
@@ -745,7 +795,7 @@ if 'oper_time' not in entities_df['train_info'].columns:
 # <a id='merge_loco'></a>
 # #### Добавление номера, местоположения и времени до ТО в loco_attributes [ToC](#toc)
 
-# In[73]:
+# In[111]:
 
 entities_df['loco_attributes']['number'] = entities_df['loco_attributes'].loco                                        .map(entities_df['loco_nums'].drop_duplicates('loco').set_index('loco').number)
 
@@ -759,7 +809,7 @@ if 'oper_time' not in entities_df['loco_attributes'].columns:
 # <a id='merge_team'></a>
 # #### Добавление номера, местоположения, состояния и информации по явке в team_attributes [ToC](#toc)
 
-# In[74]:
+# In[112]:
 
 entities_df['team_attributes']['number'] = entities_df['team_attributes'].team                                            .map(entities_df['team_nums'].drop_duplicates('team').set_index('team').number)
 
@@ -774,7 +824,7 @@ if 'oper_time' not in entities_df['team_attributes'].columns:
 # <a id='save_csv'></a>
 # ## Выгрузка результатов в csv-файлы [ToC](#toc)
 
-# In[75]:
+# In[113]:
 
 TEST_FOLDER = 'test/'
 
@@ -787,7 +837,7 @@ for key in entities_df.keys():
 # <a id='series'></a>
 # #### Создание вспомогательного файла с названиями серий [ToC](#toc)
 
-# In[77]:
+# In[114]:
 
 ser_id, ser_name, ser_desc = [], [], []
 cnt = 1
@@ -812,7 +862,7 @@ series['ser_type'] = series.ser_name.apply(lambda x: 'Электровоз' if a
 series.to_csv(FOLDER + 'loco_series.csv', index=False, encoding='utf-8')
 
 
-# In[194]:
+# In[115]:
 
 t = time.time() - start_time
 print('Общее время выполнения: %.2f сек.' % t)
