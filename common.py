@@ -1,4 +1,4 @@
-FOLDER = 'resources/'
+﻿FOLDER = 'resources/'
 
 import numpy as np
 import pandas as pd

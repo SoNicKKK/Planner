@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -27,7 +27,7 @@
 report = ''
 FOLDER = 'resources/'
 REPORT_FOLDER = 'report/'
-PRINT = True
+PRINT = False
 
 
 # ### Функции для экспорта в HTML
@@ -94,7 +94,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython import get_ipython
 
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 plt.style.use('fivethirtyeight')
 plt.rc('font', family='Times New Roman')
 
@@ -292,10 +292,6 @@ loco_info_regs['ser_desc'] = loco_info_regs.ser_name.map(loco_series.drop_duplic
 a = loco_info_regs.loc[(loco_info_regs.ltype == 1) & (loco_info_regs.ser_desc.isin(['Грузовое', 'Грузопассажирское']))]            .groupby(['region', 'reg_name_str']).ser_name.unique().to_frame()
 b = loco_info_regs.loc[(loco_info_regs.ltype == 1) & (loco_info_regs.ser_desc.isin(['Грузовое', 'Грузопассажирское']))]            .groupby(['region', 'reg_name_str']).ser_type.unique().to_frame()
 c = a.join(b)
-print(loco_info.head())
-print(a.head())
-print(b.head())
-print(c.head())
 d = c.join(loco_info_regs.loc[loco_info_regs.ltype == 1].groupby(['region', 'reg_name_str']).loco.count())
 #print('Total locos:', loco_info.loco.drop_duplicates().count())
 #print('Freight locos:', loco_info.loc[loco_info.ser_desc.isin(['Грузовое', 'Грузопассажирское'])].loco.drop_duplicates().count())
