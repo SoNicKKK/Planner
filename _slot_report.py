@@ -1,7 +1,7 @@
 ﻿
 # coding: utf-8
 
-# In[285]:
+# In[1]:
 
 report = ''
 FOLDER = 'resources/'
@@ -9,7 +9,7 @@ REPORT_FOLDER = 'report/'
 PRINT = False
 
 
-# In[286]:
+# In[2]:
 
 def add_line(line, p=PRINT):    
     global report        
@@ -58,7 +58,7 @@ def create_report(filename):
     print('Отчет сформирован: %s' % filename)
 
 
-# In[287]:
+# In[3]:
 
 FOLDER = 'resources/'
 
@@ -98,7 +98,7 @@ print('Время составления отчета:', time.strftime(time_form
 print('Время запуска планировщика: %s (%d)' % (time.strftime(time_format, time.localtime(current_time)), current_time))
 
 
-# In[288]:
+# In[4]:
 
 # Мержим таблицы _plan и _info для поездов, локомотивов и бригад
 # Добавляем во все таблицы названия станций на маршруте и времена отправления/прибытия в читабельном формате
@@ -131,20 +131,20 @@ team_plan = team_plan.merge(team_info, on='team', suffixes=('', '_info'), how='l
 team_plan['team_type'] = team_plan.team.apply(lambda x: 'Реальная' if str(x)[0] == '2' else 'Фейковая')
 
 
-# In[289]:
+# In[5]:
 
 def nice_time(t):
     return time.strftime(time_format, time.localtime(t)) if t > 0 else ''
 
 
-# In[290]:
+# In[6]:
 
 add_header('Анализ расхождений времен хода поездов и времен хода в нитках', h=2, p=False)
 
 
 # ### Загружаем нитки, преобразуем все времена в datetime
 
-# In[291]:
+# In[7]:
 
 slot = pd.read_csv(FOLDER + 'slot.csv', dtype={'st_from':str, 'st_to':str})
 add_info(slot)
@@ -154,7 +154,7 @@ slot['dt_from'] = slot.time_start.apply(lambda x: datetime.datetime.fromtimestam
 slot['dt_to'] = slot.time_end.apply(lambda x: datetime.datetime.fromtimestamp(x))
 
 
-# In[292]:
+# In[8]:
 
 pr_st = pd.read_csv(FOLDER + 'mandatory/priority_team_change_stations.csv', sep=';', dtype={'station':str})
 pr_st.head()
@@ -162,7 +162,7 @@ pr_st.head()
 
 # #### Если в нитке предусмотрена стоянка на маленькой станции (для разъезда), прибавляем ее к времени хода
 
-# In[293]:
+# In[9]:
 
 slot['next_time_start'] = slot.time_start.shift(-1)
 slot['slot_end'] = slot.slot != slot.slot.shift(-1)
@@ -176,7 +176,7 @@ slot[slot.slot == slot.slot.unique()[0]][cols]
 
 # #### Анализируем времена таких стоянок на мелких станциях (возможно, ошибки в нитках?)
 
-# In[294]:
+# In[10]:
 
 #sns.set(style='whitegrid', context='notebook')
 #sns.set_color_codes('dark')
@@ -187,7 +187,7 @@ print('Mean stop time = %.2f +/- %.2f s.' % (m, s))
 slot[slot.stop_time > m + s][cols].sort_values('stop_time', ascending=False).head()
 
 
-# In[295]:
+# In[11]:
 
 cols = ['slot', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm', 'tt', 'stop_time', 'tt_stops']
 big_stops = slot[slot.stop_time > m + s].sort_values('stop_time', ascending=False)
@@ -199,7 +199,7 @@ slot[slot.slot == 200230423676][cols]
 
 # #### TO DO: Подумать, как переписать: работает очень долго
 
-# In[296]:
+# In[12]:
 
 tracks = slot.dropna(subset=['st_from_name', 'st_to_name'], how='any').link_name.unique()
 res = {}
@@ -214,12 +214,12 @@ df_3h.columns = ['link_name', 'dt_from', 'tt']
 df_3h.head()
 
 
-# In[297]:
+# In[13]:
 
 max_check_time = datetime.datetime.fromtimestamp(current_time) + datetime.timedelta(1)
 
 
-# In[298]:
+# In[14]:
 
 st_from, st_to = 'ОБЛУЧЬЕ', 'АРХАРА'
 df_3h[df_3h.link_name == (st_from, st_to)]
@@ -228,7 +228,7 @@ df_3h[df_3h.link_name == (st_from, st_to)]
 
 # ### Для каждого поезда находим начало трехчасового интервала для времени отправления
 
-# In[299]:
+# In[15]:
 
 train_plan['dt_from'] = train_plan.time_start.apply(datetime.datetime.fromtimestamp)
 a = train_plan.set_index('dt_from').resample('3H', how={'time_start':min}).to_dict()['time_start']
@@ -238,7 +238,7 @@ train_plan[['train', 'time_start', 'dt_from', 'dt_3h']].head()
 
 # ### Подставляем в поездные планы среднее время хода из нитки
 
-# In[300]:
+# In[16]:
 
 train_plan['link_name'] = list(zip(train_plan.st_from_name, train_plan.st_to_name))
 train_plan['dt_link_name'] = list(zip(train_plan.link_name, train_plan.dt_3h))
@@ -251,7 +251,7 @@ train_plan.slot_tt.fillna(-1, inplace=True)
 
 # #### Гистограмма отклонений времен хода поездов от времен хода в нитках
 
-# In[301]:
+# In[17]:
 
 train_plan['tt'] = train_plan.time_end - train_plan.time_start
 train_plan['slot_tt'] = train_plan.slot_tt.apply(int)
@@ -278,19 +278,19 @@ add_image(filename)
 
 # #### Выбросы (большие отклонения времен хода поездов от времен хода в нитках)
 
-# In[302]:
+# In[18]:
 
 max_check_time = datetime.datetime.fromtimestamp(current_time) + datetime.timedelta(1)
 #last_dt = df_3h.sort_values('dt_from').iloc[-1].dt_from
 df_tt_delta = df_tt_delta[df_tt_delta.dt_3h <= max_check_time]
 
 
-# In[303]:
+# In[19]:
 
 df_tt_delta['delta_rat'] = df_tt_delta.tt_delta_abs / df_tt_delta.slot_tt
 
 
-# In[304]:
+# In[20]:
 
 outliers = df_tt_delta[df_tt_delta.tt_delta.apply(lambda x: np.abs(x - tt_delta_mean) > 3 * tt_delta_std)]
 cols = ['train', 'st_from_name', 'st_to_name', 'dt_from', 'dt_3h', 'tt', 'slot_tt', 'tt_delta', 'tt_link', 'delta_rat']
@@ -311,7 +311,7 @@ add_image(filename)
 
 # #### Подробная статистика по участку, где больше всего выборосов
 
-# In[305]:
+# In[21]:
 
 cols = ['train', 'st_from_name', 'st_to_name', 'time_start', 'dt_from', 'tt', 'slot_tt', 'tt_delta_abs', 'tt_link', 'delta_rat']
 l = outliers.groupby(['link_name', 'dt_3h']).train.count().sort_values(ascending=False).reset_index().ix[0].link_name
@@ -326,7 +326,7 @@ add_line(outliers[(outliers.st_from_name == st_from)
                   & (outliers.st_to_name == st_to)].sort_values('tt_delta_abs', ascending=False)[cols].head(10))
 
 
-# In[306]:
+# In[22]:
 
 cols = ['train', 'st_from_name', 'st_to_name', 'dt_from', 'tt', 'slot_tt', 'tt_delta_abs', 'tt_link', 'delta_rat']
 add_header('Примеры самых больших (по модулю отклонения) выбросов:', h=3)
@@ -337,14 +337,14 @@ add_line(outliers.sort_values('tt_delta_abs', ascending=False)[cols].head(10))
 
 # ### Участки планирования без слотов
 
-# In[307]:
+# In[23]:
 
 slot['link_name'] = list(zip(slot.st_from_name, slot.st_to_name))
 links['link_name'] = list(zip(links.st_from_name, links.st_to_name))
 slot.dropna(subset=['st_from_name', 'st_to_name'], how='any', inplace=True)
 
 
-# In[308]:
+# In[24]:
 
 slot['tt'] = slot.time_end - slot.time_start
 links['slot_tt_init'] = links.link_name.map(slot.groupby('link_name').tt.mean())
@@ -354,6 +354,15 @@ links_no_slots = links[links.slot_tt.isnull()]
 links_no_slots_names = links_no_slots.link_name.unique()
 add_header('Всего %d участков планирования без слотов:' % len(links_no_slots_names))
 add_line(links_no_slots_names)
+
+
+# In[29]:
+
+big_st = stations[stations.norm_time != 0].name.unique()
+links_no_big = links_no_slots[(links_no_slots.st_from_name.isin(big_st)) 
+                              | (links_no_slots.st_to_name.isin(big_st))].link_name.unique()
+add_header('Всего %d участков планирования от крупных станций без слотов:' % len(links_no_big))
+add_line(links_no_big)
 
 
 # ### Выявление участков с неправильным нормативным временем хода

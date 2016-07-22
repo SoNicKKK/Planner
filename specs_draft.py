@@ -1,7 +1,7 @@
 ﻿
 # coding: utf-8
 
-# In[73]:
+# In[2]:
 
 #get_ipython().magic('run common.py')
 
@@ -45,7 +45,7 @@
 # 4. Из графика этой функции (см. ниже) видно, что при небольших временах хода по слоту (до 10 часов) вывозным локомотивам будет, по сути, добавляться +1 в функцию полезности, а при больших временах (больше 20 часов) – добавляться -1. Такая модель будет соответствовать реальным требованиям к планированию.
 # 6.	На картинке приведено семейство графиков в зависимости от значения коэффициента под экспонентой (k). В формуле выше этот коэффициент равен 1. Его значение влияет на то, насколько график будет растянут возле среднего значения времени хода. Предлагается выбрать значение $k = 1.0$, а затем поменять в случае необходимости. Видно, что при больших k будет уменьшаться длина слотов, для которых будет добавка +1, с увеличением длины эта добавка будет убывать быстрее.
 
-# In[74]:
+# In[3]:
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -70,7 +70,7 @@ plt.show()
 
 # На плече Мариинск - Борзя работают вывозные локомотивы серии 2ЭС5К депо приписки Вихоревка. Эти локомотивы имеют номера от 80 до 87 включительно.
 
-# In[75]:
+# In[4]:
 
 cols = ['loco', 'number', 'ser_name', 'depot_name', 'loc_name']
 loco_info['ser_name'] = loco_info.series.map(loco_series.set_index('ser_id').ser_name)
@@ -82,7 +82,7 @@ vyv = loco_info[(loco_info.ser_name.apply(lambda x: 'ЭС5К' in x)) & (loco_inf
 vyv[cols]
 
 
-# In[76]:
+# In[5]:
 
 cols = ['loco', 'number', 'ser_name', 'regions', 'st_from_name', 'st_to_name', 'time_start', 'time_end', 'train']
 loco_plan['ser_name'] = loco_plan.series.map(loco_series.set_index('ser_id').ser_name)
@@ -119,26 +119,30 @@ trips
 #   
 # 7. TODO: Додумать такой момент: явку не двигать, но время отправления поезда сдвигать можно. Узнать у технологов, на сколько время отправления может быть позже времени явки.
 
-# In[77]:
+# In[20]:
 
 shift = 0.25
 precision = 200
 epsilon = 0.001
 t_pres = 1
 k_opt = np.log(2 / epsilon) / shift
-k_round = 10 / shift
+k_round = 5 / shift
 print('k_opt = %.4f, k_round = %.2f' % (k_opt, k_round))
 
 x = np.linspace(-0, 2.5, precision)
-y = 2/(1 + np.exp(k_opt * ((x - t_pres) - shift))) - 1
+y = 2/(1 + np.exp(k_round * ((x - t_pres) - shift))) - 1
 yc = np.linspace(-1, 1, precision)
+yc1 = [1.0] * precision
 plt.figure(figsize=(10, 5))
 sns.set(style='whitegrid', context='talk')
 sns.set_color_codes('dark')
-plt.plot(x, y, label='shift=%.2f, k=%.2f' % (shift, k_opt))
+plt.plot(x, y, label='shift=%.2f, k=%.2f' % (shift, k_round))
 plt.plot([t_pres + shift] * precision, yc, 'r--', lw=1.0)
 plt.plot([t_pres] * precision, yc, 'g--', lw=1.0)
-plt.plot([t_pres + 2 * shift] * precision, yc, 'g--', lw=1.0)    
+plt.plot([t_pres + 2 * shift] * precision, yc, 'g--', lw=1.0)
+#plt.plot(x, [1.0] * precision, 'g--', lw=1.0)
+axes = plt.gca()
+axes.set_ylim([-1.5, 1.5])
 plt.legend(frameon=True)
 plt.show()
 
@@ -151,7 +155,7 @@ plt.show()
 
 # #### Составляем таблицу с поездками локомотивов резервом
 
-# In[219]:
+# In[7]:
 
 cols = ['loco', 'number', 'ser_name', 'st_from_name', 'st_to_name', 'time_start', 'time_end', 'train', 'n_state']
 loco_plan['n_state'] = loco_plan.state.shift(-1)
@@ -175,7 +179,7 @@ nice_print(trips.sort_values('def_tt', ascending=False).head(), cols=cols)
 
 # #### Статистика по временам пересылок
 
-# In[199]:
+# In[ ]:
 
 sns.set(style='whitegrid', context='notebook')
 plt.figure(figsize=(8, 4))
@@ -184,7 +188,7 @@ sns.kdeplot(trips.tt)
 
 # #### Поиск оптимальной границы
 
-# In[196]:
+# In[ ]:
 
 # От Войтенко: список примерных предельных маршрутов для локомотивов резервом
 
@@ -194,7 +198,7 @@ res_lims = [('НАХОДКА-ВОСТОЧНАЯ', 'ХАБАРОВСК II'), ('Х
 ('ТАЙШЕТ', 'КРАСНОЯРСК-ВОСТОЧНЫЙ'), ('КРАСНОЯРСК-ВОСТОЧНЫЙ', 'МАРИИНСК')]
 
 
-# In[197]:
+# In[ ]:
 
 d = {}
 for x in res_lims:
@@ -205,7 +209,7 @@ print(lens.sort_values())
 
 # #### Подсчет локомотивов, время пересылки резервом которых лежит за границей
 
-# In[220]:
+# In[ ]:
 
 lim_time = 15
 print('Number of overtimed reserve trips: %d' % trips[trips.tt > lim_time].loco.count())
@@ -214,7 +218,7 @@ print('Part of overtimed reserve trips: %.4f' % (trips[trips.tt > lim_time].loco
 
 # #### Локомотивы, которые пересылались резервом для проведения ТО
 
-# In[218]:
+# In[ ]:
 
 cols = ['loco', 'number', 'ser_name', 'st_from_name', 'st_to_name', 'train', 'n_state', 'tt', 'def_tt']
 res_to = trips[trips.n_state == 4]

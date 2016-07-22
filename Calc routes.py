@@ -53,7 +53,7 @@ def log_progress(sequence, every=None, size=None):
         label.value = str(index or '?')
 
 
-# In[3]:
+# In[2]:
 
 import pandas as pd
 import numpy as np
@@ -78,7 +78,7 @@ print('Таблица с весами ребер графа сети загру�
 print(cost.head(10).to_string(index=False))
 
 
-# In[4]:
+# In[3]:
 
 start_time = time.time()
 # names
@@ -92,7 +92,7 @@ g.add_weighted_edges_from(list(zip(cost.st_from_name, cost.st_to_name, cost.cost
 print('NetworkX граф создан')
 
 
-# In[113]:
+# In[4]:
 
 def get_path(df_cost, col_cost, suffix, st_from, st_to, details=False):
     if suffix == 'name':
@@ -161,7 +161,7 @@ print('Выборка этого же маршрута из массива вс�
 print('\nTotal time = %.2f sec' % (time.time() - start_time))
 
 
-# In[114]:
+# In[30]:
 
 def save_paths_to_file(all_paths, all_lengths, filename='paths.csv'):
     print('Запись маршрутов в файл %s ...' % filename)
@@ -174,6 +174,8 @@ def save_paths_to_file(all_paths, all_lengths, filename='paths.csv'):
     df_lengths.name = 'cost'
     df_paths = df_lengths.to_frame().join(df_paths).reset_index()
     df_paths.columns = ['ST_FROM', 'ST_TO', 'ROUTE_COST', 'ROUTE']
+    df_paths.ST_FROM = df_paths.st_from.apply(int)
+    df_paths.ST_TO = df_paths.st_to.apply(int)
     df_paths.ROUTE_COST = df_paths.ROUTE_COST.apply(lambda x: np.round(x, 2))
     df_paths.ROUTE = df_paths.ROUTE.apply(lambda x: str(x)[1:-1].replace(', ', ','))
     df_paths.to_csv(filename, encoding='utf-8-sig', index=False, sep=';')
@@ -183,7 +185,7 @@ def save_paths_to_file(all_paths, all_lengths, filename='paths.csv'):
     print(df_paths.sample(10).to_string(index=False))
 
 
-# In[115]:
+# In[7]:
 
 tepl_coef = 0.2
 one_line_coef = 0.4
@@ -199,7 +201,7 @@ def set_cost(regs, set_coeff=tepl_coef):
         cost = 1 + set_coeff
     return cost
 
-reg_type = pd.read_csv(FOLDER + 'reg_type.csv', encoding='utf-8-sig', sep=';')
+reg_type = pd.read_csv(FOLDER + 'mandatory/reg_type.csv', encoding='utf-8-sig', sep=';')
 reg_type.columns = ['loco_region', 'reg_name', 'reg_type']
 links = pd.read_csv(FOLDER + 'link.csv', encoding='utf-8-sig')
 stations_regs = stations.groupby('station').loco_region.apply(lambda x: x.values)
@@ -213,7 +215,7 @@ links['tcost'] = links.tcost - (links.lines - 2) * one_line_coef
 print(links.head(10).to_string(index=False))
 
 
-# In[145]:
+# In[14]:
 
 COST_FOR_ABSENT_LINK = 5.0
 def get_cost_for_absent_link(ser, fill_type='mean'):        
@@ -224,25 +226,19 @@ cols = ['link_name', 'cost', 'tcost']
 cost['tcost'] = cost.tcost + (cost.cost - 1)
 cost['tcost'] = cost.tcost.apply(lambda x: 0 if x < 0 else x)
 print('Участки, для которых не заданы веса:', cost[cost.tcost.isnull()].link_name.unique())
-#cost['tcost'].fillna(np.round(get_cost_for_absent_link(cost.tcost, fill_type='mean'), 2), inplace=True)
+cost['tcost'].fillna(np.round(get_cost_for_absent_link(cost.tcost, fill_type='const'), 2), inplace=True)
 #print(cost.sort_values('tcost', ascending=True).head(10)[cols].to_string(index=False))
 links['st_from_name'] = links.st_from.map(st_names.name)
 links['st_to_name'] = links.st_to.map(st_names.name)
 links_cols = ['st_from_name', 'st_to_name', 'time', 'dist', 'dir', 'lines', 'road', 'tcost']
 
 
-# In[155]:
-
-#cost[cost.tcost.isnull()]
-cost['nei'] = cost.apply(lambda row: if np)
-
-
-# In[117]:
+# In[15]:
 
 get_path(cost, 'tcost', suffix='name', st_from='МАРИИНСК', st_to='ПОСТЫШЕВО', details=True)
 
 
-# In[139]:
+# In[32]:
 
 start_time = time.time()
 links['el'] = links.regs.apply(lambda x: set_cost(x, set_coeff=-1)) # el = 1, если участок электровозный и 0, если тепловозный
@@ -255,8 +251,8 @@ tests = [['МАРИИНСК', 'НАХОДКА', 'ИРКУТСК-СОРТИРОВ
         ['АЧИНСК I', 'АБАКАН', 'УЖУР', True],
         ['ЗИМА', 'СЛЮДЯНКА I', 'КАЯ', False],
         ['АЧИНСК I', 'ИЛАНСКАЯ', 'КРАСНОЯРСК-ВОСТОЧНЫЙ', True],
-        ['МАРИИНСК', 'ТЫНДА', 'ИРКУТСК-СОРТИРОВОЧНЫЙ', True],
-        ['МАРИИНСК', 'ПОСТЫШЕВО', 'ИРКУТСК-СОРТИРОВОЧНЫЙ', True]]        
+        ['МАРИИНСК', 'ТЫНДА', 'ИРКУТСК-СОРТИРОВОЧНЫЙ', True]]
+        #['МАРИИНСК', 'ПОСТЫШЕВО', 'ИРКУТСК-СОРТИРОВОЧНЫЙ', True]]        
 
 STEP = 0.05
 bound = int(1 / STEP)
@@ -289,7 +285,7 @@ print('Finish. Total time = %.2f sec' % (time.time() - start_time))
 df_res = pd.DataFrame(res, columns=['tepl', 'one_line', 'test'])
 
 
-# In[140]:
+# In[33]:
 
 import seaborn as sns
 #get_ipython().magic('matplotlib inline')
@@ -307,7 +303,7 @@ ax.set_ylabel('Добавка для тепловозного хода')
 
 # ### Запись наилучших весов в датафрейм
 
-# In[125]:
+# In[18]:
 
 tepl_coef = 0.75
 one_line_coef = 0.7
@@ -321,7 +317,7 @@ cost['tcost_round'] = cost.tcost.apply(lambda x: '{:.2f}'.format(x))
 
 # ### Результаты тестов
 
-# In[134]:
+# In[19]:
 
 for test in tests:    
     path1, length1 = get_path_no_print(cost, 'tcost', suffix='name', st_from=test[0], st_to=test[1])
@@ -330,7 +326,7 @@ for test in tests:
     print('%s. Path from %s to %s (total cost %.2f): %s\n' % (str(res).upper(), test[0], test[1], length1, path1))    
 
 
-# In[138]:
+# In[20]:
 
 path1, length1 = get_path_no_print(cost, 'tcost', suffix='name', st_from='МАРИИНСК', st_to='МЕЖДУРЕЧЕНСК')
 print(path1)
@@ -338,7 +334,7 @@ print(path1)
 
 # ### Выгрузка весов в файл
 
-# In[122]:
+# In[26]:
 
 df_cost = cost[['st_from', 'st_to', 'st_from_esr', 'st_to_esr', 'st_from_name', 'st_to_name', 'tcost_round']]
 df_cost.columns = df_cost.columns.map(lambda x: x.upper())
@@ -349,7 +345,7 @@ print('Веса участков выгружены в файл', filename)
 
 # ### Выгрузка маршрутов в файл
 
-# In[123]:
+# In[31]:
 
 all_paths, all_lengths = get_all_paths(cost, 'tcost', suffix='')
 save_paths_to_file(all_paths, all_lengths, filename='paths_id.csv')

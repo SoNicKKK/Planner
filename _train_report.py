@@ -4,6 +4,7 @@
 # <a id='toc'></a>
 # # Отчет по запланированным поездам
 
+# 1. [Проверка планирования всех реальных поездов](#all_plan)
 # 1. [Проверка совпадения четности номеров поездов и направления движения](#oddity)
 # 2. [Анализ времен стоянок поездов на станциях смены локомотивов и бригад.](#stop_time)
 #    1. [Смена локомотивов](#stop_loco)
@@ -16,7 +17,7 @@
 
 # ### Функции для экспорта в HTML
 
-# In[325]:
+# In[258]:
 
 report = ''
 FOLDER = 'resources/'
@@ -24,7 +25,7 @@ REPORT_FOLDER = 'report/'
 PRINT = False
 
 
-# In[326]:
+# In[259]:
 
 def add_line(line, p=PRINT):    
     global report        
@@ -75,7 +76,7 @@ def create_report(filename):
 
 # ## Загрузка и подготовка данных
 
-# In[327]:
+# In[260]:
 
 import numpy as np
 import pandas as pd
@@ -90,7 +91,7 @@ plt.rc('font', family='Tahoma')
 
 pd.set_option('max_rows', 50)
 
-time_format = '%b %d, %H:%M'
+time_format = '%d/%m %H:%M'
 
 start_time = time.time()
 current_time = pd.read_csv(FOLDER + 'current_time.csv').current_time[0]
@@ -114,7 +115,7 @@ print('Время составления отчета:', time.strftime(time_form
 print('Время запуска планировщика: %s (%d)' % (time.strftime(time_format, time.localtime(current_time)), current_time))
 
 
-# In[328]:
+# In[261]:
 
 def nice_time(t):        
     return time.strftime(time_format, time.localtime(t)) if np.isnan(t) == False else None
@@ -162,16 +163,45 @@ if 'loco' not in train_plan.columns:
                      on=['train', 'time_start'], how='left')
 
 
+# <a id='all_plan'></a>
+
+# ## Проверка планирования всех реальных поездов [ToC](#toc)
+
+# In[262]:
+
+routes = pd.read_csv(FOLDER + 'routes.csv', dtype={'st_from':str, 'st_to':str, 'train':str})
+add_info(routes)
+routes.dropna(subset=['st_from_name', 'st_to_name'], how='any', inplace=True)
+start_st = routes.drop_duplicates('train').set_index('train')
+end_st = routes.drop_duplicates('train', keep='last').set_index('train')
+train_info['first_st'] = train_info.train.map(start_st.st_from_name)
+train_info['last_st'] = train_info.train.map(end_st.st_to_name)
+
+
+# In[263]:
+
+train_info['in_plan'] = train_info.train.isin(train_plan.train)
+a = train_info[(train_info.in_plan == False) 
+               & (train_info.number > 1000) 
+               & (train_info.number < 9000)
+               & ((train_info.st_from != train_info.st_to) | (train_info.st_from == -1))\
+              ].sort_values('number')
+with pd.option_context('display.max_colwidth', 25):
+    add_header('Всего %d реальных поездов (%.2f%%) не запланировано:' 
+               % (a.train.count(), 100 * a.train.count() / train_info.train.count()))
+    add_line(a[['train', 'number', 'ind434', 'loc_name', 'in_plan', 'first_st', 'last_st']])
+
+
 # <a id='oddity'></a>
 # ## Проверка совпадения четности номеров поездов и направления движения [ToC](#toc)
 
-# In[329]:
+# In[264]:
 
 add_header('Проверки по поездам', h=1, p=False)
 add_header('Проверка совпадения четности номеров поездов и направления движения', h=2, p=False)
 
 
-# In[330]:
+# In[265]:
 
 train_plan['dir'] = train_plan.link.map(links.set_index('link').dir)
 train_plan['odevity'] = (((train_plan.number / 2).astype(int) * 2 == train_plan.number).astype(int) + 1) % 2
@@ -193,7 +223,7 @@ else:
 
 # #### Параметры для анализа
 
-# In[331]:
+# In[266]:
 
 # Минимальное время стоянки поезда для смены локомотива
 min_loco_stop = 1 * 3600 # 1 hour = 60 min
@@ -208,14 +238,14 @@ hor = 24 * 3600
 # <a id='stop_loco'></a>
 # ### Смена локомотивов [ToC](#toc)
 
-# In[332]:
+# In[267]:
 
 add_header('Анализ смен локомотивов на маршрутах поездов', h=2, p=False)
 
 
 # #### Ищем станции смены локомотивов и считаем средние времена
 
-# In[333]:
+# In[268]:
 
 train_plan.columns
 train_plan.loco.fillna('-1', inplace=True)
@@ -236,7 +266,7 @@ loco_change = train_plan[(train_plan.train_end == False) & (train_plan.loco_end 
                         & (train_plan.time_end < current_time + hor)]
 
 
-# In[334]:
+# In[269]:
 
 add_header('Средние времена на смену локомотивов:')
 add_line('- по всем сменам: %.2f ч.' % loco_change.stop_time_h.mean())
@@ -245,7 +275,7 @@ add_line('- по всем сменам с ненулевым временем: %
 
 # #### Ищем поезда, у которых смена локомотивов происходит за нулевое время
 
-# In[335]:
+# In[270]:
 
 cols = ['train', 'st_from_name', 'st_to_name', 'loco', 'next_loco', 'stop_time_h']
 nill_stop_times = loco_change[loco_change.stop_time == 0]
@@ -264,7 +294,7 @@ else:
 
 # #### Составляем статистику по всем станциям смены, загружаем список приоритетных станций смены
 
-# In[336]:
+# In[271]:
 
 cols = ['train', 'st_from_name', 'st_to_name', 'loco', 'next_loco', 'stop_time_h']
 no_nill_stops = loco_change[loco_change.stop_time > 0]
@@ -278,7 +308,7 @@ priority_change_stations = pd.read_csv(FOLDER + 'mandatory/priority_loco_change_
 
 # #### Ищем поезда, у которых смена локомотивов происходит на неправильных станциях
 
-# In[337]:
+# In[272]:
 
 # bad change stations
 bad_changes = st_change[st_change.st_to_name.isin(priority_change_stations) == False].sort_values('train', ascending=False)
@@ -305,7 +335,7 @@ else:
 
 # #### Ищем поезда со слишком долгой стоянкой для смены локомотивов
 
-# In[338]:
+# In[273]:
 
 cols = ['train', 'st_from_name', 'st_to_name', 'loco', 'next_loco', 'stop_time_h']
 long_change = loco_change[(loco_change.st_to_name.isin(priority_change_stations)) 
@@ -317,18 +347,18 @@ add_line(long_change[cols].head(10))
 # <a id='stop_team'></a>
 # ### Смена бригад [ToC](#toc)
 
-# In[339]:
+# In[274]:
 
 add_header('Анализ смен бригад на маршрутах поездов', h=2, p=False)
 
 
-# In[340]:
+# In[275]:
 
 team_change = train_plan[(train_plan.loco_end == False) & (train_plan.team_end == True)
                         & (train_plan.time_end < current_time + hor)]
 
 
-# In[341]:
+# In[276]:
 
 add_header('Средние времена на смену бригады:')
 add_line('- по всем сменам: %.2f ч.' % team_change.stop_time_h.mean())
@@ -337,7 +367,7 @@ add_line('- по всем сменам с ненулевым временем: %
 
 # #### Ищем поезда, у которых смена бригады происходит за нулевое время
 
-# In[342]:
+# In[277]:
 
 cols = ['train', 'st_from_name', 'st_to_name', 'team', 'next_team', 'stop_time_h']
 nill_stop_times = team_change[team_change.stop_time == 0]
@@ -356,7 +386,7 @@ else:
 
 # #### Ищем поезда со слишком долгой стоянкой для смены бригады
 
-# In[343]:
+# In[278]:
 
 cols = ['train', 'st_from_name', 'st_to_name', 'team', 'next_team', 'stop_time_h']
 long_change = team_change[team_change.stop_time_h > 6].sort_values('stop_time', ascending=False)[cols]
@@ -378,12 +408,12 @@ else:
 # <a id='dep_interval'></a>
 # ## Поиск поездов с интервалом между отправлениями меньше допустимого [ToC](#toc)
 
-# In[344]:
+# In[279]:
 
 add_header('Поиск поездов с интервалом между отправлениями меньше допустимого', h=2, p=False)
 
 
-# In[345]:
+# In[280]:
 
 # Параметры
 
@@ -391,7 +421,7 @@ hor = 24 * 3600
 min_time_delta = 5 * 60 # 5 minutes
 
 
-# In[346]:
+# In[281]:
 
 # Функция, которая возвращает датафрейм с коллизиями
 
@@ -404,7 +434,7 @@ def check_time_collision(df):
     return collisions
 
 
-# In[347]:
+# In[282]:
 
 add_line('Время начала планирования: %s' % nice_time(current_time))
 cols = ['train', 'loco', 'team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f']
@@ -442,12 +472,12 @@ add_line(no_res_coll[cols].head(20))
 # <a id='ssp'></a>
 # ## Сравнение количества запланированных поездов с данными АС ССП [ToC](#toc)
 
-# In[348]:
+# In[283]:
 
 add_header('Сравнение количества запланированных поездов с данными АС ССП', h=2, p=False)
 
 
-# In[349]:
+# In[284]:
 
 def count_volumes(full_plan, df_ssp):
     hor = 24 * 3600
@@ -468,7 +498,7 @@ def count_volumes(full_plan, df_ssp):
     return trains.to_frame().join(df_ssp[['st_from_name', 'st_to_name', 'depart', 'st_from_show', 'st_to_show', 'dep_dir']].                                  set_index(['st_from_name', 'st_to_name'])).reset_index()
 
 
-# In[350]:
+# In[285]:
 
 def show_barplot(df, road_name):
     df['delta'] = df.train - df.depart
@@ -489,7 +519,7 @@ def show_barplot(df, road_name):
     c.set(xlabel=xlabel, ylabel='')
 
 
-# In[351]:
+# In[286]:
 
 VOL_PERCENT = 0.9
 
@@ -526,7 +556,7 @@ def show_two_barplots(df, road_name, save=False, btype='less'):
         add_image(filename, scale=1.0)
 
 
-# In[352]:
+# In[287]:
 
 def func(x):
     return np.round(np.sqrt(np.mean(x ** 2)), 2)
@@ -546,7 +576,7 @@ def print_ssp_stats(ssp, road_name):
     add_line(df.groupby('dep_dir').delta.agg(func))
 
 
-# In[353]:
+# In[288]:
 
 krs = pd.read_csv(FOLDER + 'mandatory/SSP_KRS.csv', sep=';')
 vsib = pd.read_csv(FOLDER + 'mandatory/SSP_VSIB.csv', sep=';')
@@ -554,27 +584,27 @@ zab = pd.read_csv(FOLDER + 'mandatory/SSP_ZAB.csv', sep=';')
 dvs = pd.read_csv(FOLDER + 'mandatory/SSP_DVS.csv', sep=';')
 
 
-# In[354]:
+# In[289]:
 
 print_ssp_stats(krs, 'КРАС')
 
 
-# In[355]:
+# In[290]:
 
 print_ssp_stats(vsib, 'ВСИБ')
 
 
-# In[356]:
+# In[291]:
 
 print_ssp_stats(zab, 'ЗАБ')
 
 
-# In[357]:
+# In[292]:
 
 print_ssp_stats(dvs, 'ДВС')
 
 
-# In[358]:
+# In[293]:
 
 # Пример построения barplot
 
@@ -589,12 +619,12 @@ print_ssp_stats(dvs, 'ДВС')
 # <a id='info_plan_depart'></a>
 # ## Проверка соответствия первого участка в запланированном маршруте и исходного факта [ToC](#toc)
 
-# In[359]:
+# In[294]:
 
 add_header('Проверка соответствия первого участка в запланированном маршруте и исходного факта', h=2, p=False)
 
 
-# In[360]:
+# In[295]:
 
 cols = ['train', 'st_from_name', 'st_to_name', 'time_start_f', 'st_from_name_info', 'st_to_name_info', 'oper_time_f']
 td_plan = train_plan[(train_plan.st_from_info.isnull() == False) 
@@ -614,12 +644,12 @@ add_line(td_bad_time.sort_values('oper_time')[cols].head(10))
 # <a id='time_leaps'></a>
 # ## Проверка скачков по времени назад [ToC](#toc)
 
-# In[361]:
+# In[296]:
 
 add_header('Проверка скачков по времени назад', h=2, p=False)
 
 
-# In[362]:
+# In[297]:
 
 train_plan['next_time_start'] = train_plan.time_start.shift(-1)
 train_plan['next_time_start_f'] = train_plan.time_start_f.shift(-1)
@@ -637,19 +667,19 @@ else:
 
 # ## Сравнение количества передаваемых в планировщик реальных поездов с ССП [ToC](#toc)
 
-# In[363]:
+# In[298]:
 
 # Направления для проверки
 
 test = [('ИРКУТСК-СОРТИРОВОЧНЫЙ', 'ГОНЧАРОВО'), ('ИРКУТСК-СОРТИРОВОЧНЫЙ', 'БАТАРЕЙНАЯ')]
 
 
-# In[490]:
+# In[299]:
 
 add_header('Детальное сравнение количества поездов с данными ССП по станции %s' % test[0][0], h=2, p=False)
 
 
-# In[365]:
+# In[300]:
 
 routes = pd.read_csv(FOLDER + 'routes.csv', dtype={'st_from':str, 'st_to':str, 'train':str})
 add_info(routes)
@@ -657,7 +687,7 @@ routes['link_name'] = list(zip(routes.st_from_name, routes.st_to_name))
 def_tt = pd.read_csv(FOLDER + '/mandatory/travel_times_all_pairs.csv', sep=';').set_index(['st_from_name', 'st_to_name'])
 
 
-# In[366]:
+# In[301]:
 
 def get_arrive_time(row, station):
     if (row.oper == 'depart') | (row.oper_time >= current_time):
@@ -680,29 +710,31 @@ train_info['delta_h'] = np.round((train_info.delta / 3600), 2)
 
 train_plan['link_name'] = list(zip(train_plan.st_from_name, train_plan.st_to_name))
 
-dir_trains = train_info[train_info.train.isin(routes[routes.link_name == (test_st, test_st_dir)].train)]
-cols = ['train', 'oper', 'st_loc_name', 'tt', 'lag', 'oper_time_f', 'arr_time_f', 'plan_time_f', 'delta_h']
+dir_trains = train_info[(train_info.number >= 1000)
+                        & (train_info.train.isin(routes[routes.link_name == (test_st, test_st_dir)].train))]
+cols = ['train', 'number', 'oper', 'st_loc_name', 'tt', 'lag', 'oper_time_f', 'arr_time_f', 'plan_time_f', 'delta_h']
 dir_trains = dir_trains[dir_trains.arr_time < current_time + 24 * 3600].sort_values('arr_time')
 #a[cols]
 add_header('Всего %d поездов, по которым ожидается проследование в направлении %s - %s в первые сутки планирования'
            % (dir_trains.train.count(), test_st, test_st_dir))
 
 
-# In[367]:
+# In[257]:
 
 no_plan = dir_trains[dir_trains.plan_time.isnull()][cols]
+pd.set_option('display.max_colwidth', 40)
 add_header('Всего %d поездов на направлении %s - %s, которых вообще нет в плане' % (no_plan.train.count(), test_st, test_st_dir))
 add_line(no_plan)
 
 
-# In[368]:
+# In[247]:
 
 plan_day = dir_trains[dir_trains.plan_time < current_time + 24 * 3600][cols]
 add_header('Всего %d поездов (%.2f%%), по которым запланировано проследование в направлении %s - %s в первые сутки'
           % (plan_day.train.count(), 100 * plan_day.train.count() / dir_trains.train.count(), test_st, test_st_dir))
 
 
-# In[369]:
+# In[248]:
 
 # sns.set(context='notebook', style='whitegrid')
 # sns.set_color_codes('dark')
@@ -717,22 +749,22 @@ add_header('Всего %d поездов (%.2f%%), у которых запла�
 add_line(late_trains.sort_values('delta', ascending=False)[cols])
 
 
-# In[370]:
+# In[249]:
 
 plan_cols = ['train', 'oper', 'oper_time_f', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'loco', 'team']
 add_header('Пример плана по одному из поездов, формированием НЕ на станции %s:' % test_st)
 with pd.option_context('display.max_colwidth', 15):
-    add_line(train_plan[train_plan.train == late_trains[late_trains.st_loc_name != test_st].sort_values('delta', ascending=False)           .iloc[0].train][plan_cols])
+    add_line(train_plan[train_plan.train == late_trains[late_trains.st_loc_name != test_st]                        .sort_values('delta', ascending=False).iloc[0].train][plan_cols])
 
 
-# In[463]:
+# In[250]:
 
 slot = pd.read_csv(FOLDER + 'slot.csv', dtype={'st_from':str, 'st_to':str})
 add_info(slot)
 slot['dt_start'] = slot.time_start.apply(datetime.datetime.fromtimestamp)
 
 
-# In[485]:
+# In[251]:
 
 test = [('ТАЙШЕТ', 'ТОРЕЯ')]
 (test_st, test_st_dir) = test[0]
@@ -746,13 +778,13 @@ dep_volume = a.set_index('dt_start').resample('1H', how='count').train
 dep_volume
 
 
-# In[486]:
+# In[252]:
 
 slot_volume = slot[(slot.st_from_name == test_st) & (slot.st_to_name == test_st_dir)]    .set_index('dt_start').resample('1H', how='count').slot
 dep_slot = dep_volume.to_frame().join(slot_volume)
 
 
-# In[487]:
+# In[253]:
 
 # slot_volume = slot[(slot.st_from_name == test_st) & (slot.st_to_name == test_st_dir)]\
 #     .set_index('dt_start').resample('300s')
@@ -762,13 +794,13 @@ dep_slot = dep_volume.to_frame().join(slot_volume)
 # slot_volume
 
 
-# In[488]:
+# In[254]:
 
 a = dep_slot[dep_slot.train > dep_slot.slot]
 print(a)
 
 
-# In[489]:
+# In[255]:
 
 pd.set_option('display.max_colwidth', 40)
 cols = ['train', 'st_from_name', 'st_to_name', 'dt_start']
@@ -786,7 +818,7 @@ for dt in a.index:
 # <a id='report'></a>
 # ### Экспорт в HTML [ToC](#toc)
 
-# In[371]:
+# In[256]:
 
 filename = REPORT_FOLDER + 'train_report_' + time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time())) + '.html'
 create_report(filename)

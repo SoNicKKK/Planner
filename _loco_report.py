@@ -199,6 +199,16 @@ add_line(count_assign_percent(24 * 3600))
 add_line(count_assign_percent(48 * 3600))
 
 
+# In[16]:
+
+cols = ['train', 'st_from_name', 'st_to_name', 'time_start_norm', 'loco']
+train_plan['train_type'] = train_plan.train.apply(lambda x: int(str(x)[0]))
+a = train_plan[(train_plan.time_start < current_time + 6 * 3600)
+           & (train_plan.loco.isnull())].drop_duplicates('train')
+a.train_type.value_counts()
+a[cols]
+
+
 # In[7]:
 
 a = train_plan[(train_plan.time_start < current_time + 24 * 3600) & (train_plan.loco.isnull())]    .drop_duplicates('train')    .groupby(['st_from_name', 'st_to_name']).train    .count().sort_values(ascending=False)
