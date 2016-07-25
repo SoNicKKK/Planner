@@ -1,4 +1,4 @@
-﻿
+
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -24,15 +24,15 @@
 
 # ### Константы и настройки
 
-# In[2]:
+# In[1]:
 
 report = ''
 FOLDER = 'resources/'
 REPORT_FOLDER = 'report/'
-PRINT = False
+PRINT = True
 
 
-# In[3]:
+# In[2]:
 
 time_format = '%b %d, %H:%M'
 def sprint(s):
@@ -50,7 +50,7 @@ def nice_time(t):
 
 # ### Функции для экспорта в HTML
 
-# In[4]:
+# In[3]:
 
 def add_line(line, p=PRINT):    
     global report        
@@ -105,7 +105,7 @@ def create_report(filename):
 
 # ## Загрузка и подготовка данных
 
-# In[5]:
+# In[4]:
 
 import numpy as np
 import pandas as pd
@@ -114,7 +114,7 @@ from ast import literal_eval
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-#get_ipython().magic('matplotlib inline')
+get_ipython().magic('matplotlib inline')
 plt.style.use('fivethirtyeight')
 plt.rc('font', family='Times New Roman')
 
@@ -141,7 +141,7 @@ print('Время составления отчета:', time.strftime(time_form
 print('Время запуска планировщика: %s (%d)' % (time.strftime(time_format, time.localtime(current_time)), current_time))
 
 
-# In[6]:
+# In[5]:
 
 # Мержим таблицы _plan и _info для поездов, локомотивов и бригад
 # Добавляем во все таблицы названия станций на маршруте и времена отправления/прибытия в читабельном формате
@@ -173,7 +173,7 @@ team_plan = team_plan.merge(team_info, on='team', suffixes=('', '_info'), how='l
 team_plan['team_type'] = team_plan.team.apply(lambda x: 'Реальная' if str(x)[0] == '2' else 'Фейковая')
 
 
-# In[7]:
+# In[6]:
 
 add_line('Время сбора данных и запуска планировщика: %s' % time.strftime(time_format, time.localtime(current_time)))
 
@@ -181,12 +181,12 @@ add_line('Время сбора данных и запуска планиров�
 # <a id='perc_assign'></a>
 # ## Расчет процента подвязки между локомотивами и бригадами [ToC](#toc)
 
-# In[8]:
+# In[7]:
 
 add_header('Расчет процента подвязки между локомотивами и бригадами', h=2, p=False)
 
 
-# In[9]:
+# In[8]:
 
 def count_real_assign_percent(hor):
     loco_no_team = loco_plan.loc[(loco_plan.time_start < current_time + hor) &
@@ -218,6 +218,20 @@ if 'team' not in loco_plan.columns:
 count_assign_percent(6 * 3600)
 count_assign_percent(12 * 3600)
 count_assign_percent(24 * 3600)
+
+
+# In[9]:
+
+#loco_plan['loco_time'] = list(zip(loco_plan.loco, loco_plan.time_start))
+#team_plan['loco_time'] = list(zip(team_plan.loco, team_plan.time_start))
+#loco_plan['team']
+loco_no_team = loco_plan.loc[(loco_plan.time_start < current_time + 6 * 3600) &
+                             (loco_plan.team == -1) &
+                             (loco_plan.state.isin([0, 1]))]
+#add_line(loco_no_team[['loco', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'team']].head())
+loco_id = loco_no_team.iloc[1].loco
+add_line(loco_plan[loco_plan.loco == loco_id]        [['loco', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state', 'train']])
+add_line(team_plan[team_plan.loco == loco_id].sort_values('time_start')        [['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'loco', 'state']])
 
 
 # <a id='perc_assign2'></a>
@@ -906,7 +920,7 @@ add_header('\nПримеры ошибочных бригад (первые 10):'
 add_line(no_stop.drop_duplicates('st_to_name').sort_values('time_end')[cols])
 
 
-# In[70]:
+# In[58]:
 
 add_header('Полные планы по некоторым ошибочным бригадам:')
 top_st = no_stop.st_to_name.value_counts().index[0]
@@ -927,18 +941,18 @@ add_line(team_plan[team_plan.team == no_stop[no_stop.st_to_name == sec_st].iloc[
 
 # ### Проверка случаев смены бригад не на допустимых станциях
 
-# In[151]:
+# In[59]:
 
 add_header('Проверка случаев смены бригад не на допустимых станциях', h=3, p=False)
 
 
-# In[152]:
+# In[60]:
 
 add_line('Исключаются случаи смены бригады из-за завершения маршрута локомотива или поезда' + 
          ', а также случаи смены бригады на станции, которая является депо приписки бригады')
 
 
-# In[153]:
+# In[61]:
 
 #loco_plan['loco_end'] = loco_plan.loco != loco_plan.loco.shift(-1)
 #train_ends = train_plan.drop_duplicates('train', keep='last')[['train', 'st_to_name']].set_index('train')
@@ -952,7 +966,7 @@ loco_plan['team_depot_name'] = loco_plan.team.map(team_plan.drop_duplicates('tea
 loco_plan['team_ready_depot_name'] = loco_plan.team.map(team_plan.drop_duplicates('team').set_index('team').depot_st_name)
 
 
-# In[154]:
+# In[62]:
 
 pr_st = pd.read_csv(FOLDER + 'mandatory/priority_team_change_stations.csv', sep=';', encoding='utf-8-sig', dtype={'station':str}).station
 #team_change = loco_plan[(loco_plan.state != 4) 
@@ -971,7 +985,7 @@ else:
     
 
 
-# In[155]:
+# In[63]:
 
 with (pd.option_context('display.max_colwidth', 20)):
     if not bad_team_change.st_to_name.dropna().empty:
@@ -986,12 +1000,12 @@ with (pd.option_context('display.max_colwidth', 20)):
 # <a id='presence'></a>
 # ## Проверка отправления бригады не ранее времени явки [ToC](#toc)
 
-# In[156]:
+# In[64]:
 
 add_header('Проверка отправления бригады не ранее времени явки', h=2, p=False)
 
 
-# In[157]:
+# In[65]:
 
 # Вычисляем максимальное время явки, добавляем его в team_info и team_plan
 # В таблице presence_fail --- ошибочные отправления бригад до времени явки
@@ -1011,7 +1025,7 @@ presence_fail = team_plan[(team_plan.state.isin([0, 1])) & (team_plan.presence_g
 pr = team_info[['team', 'depot_time', 'return_time', 'presence', 'presence_norm']]
 
 
-# In[165]:
+# In[66]:
 
 p = presence_fail[presence_fail.state == 0]
 ph = presence_fail[(presence_fail.state == 0) & (presence_fail.time_start >= current_time)]
@@ -1029,7 +1043,7 @@ else:
     add_header('\nНет бригад, которые запланированы к отправлению пассажирами ранее времени явки после начала планирования')
 
 
-# In[164]:
+# In[67]:
 
 f = presence_fail[presence_fail.state == 1]
 fh = presence_fail[(presence_fail.state == 1) & (presence_fail.time_start >= current_time)]
@@ -1210,7 +1224,7 @@ if not irk.empty:
 add_header('Бригады, планируемые только на явку', h=3, p=False)
 
 
-# In[91]:
+# In[81]:
 
 cols = ['team', 'st_from_name', 'time_start_f', 'time_end_f', 'depot_name', 'state_info', 'all_states']
 only_pr = team_plan[team_plan.cat == 'only_presence']
@@ -1229,15 +1243,43 @@ else:
     add_header('В плане нет бригад, запланированных только на явку')
 
 
+# ## Проверка наличия явки в планах у всех запланированных бригад
+
+# In[82]:
+
+team_plan['all_states'] = team_plan.team.map(team_plan.groupby('team').state.unique())
+no_pres = team_plan[team_plan.all_states.apply(lambda x: (2 not in x) & (1 in x))]
+cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state', 'loco']
+add_header('Всего событие явки не запланировано у %d бригад (%.2f%%). Примеры:'
+           % (no_pres.drop_duplicates('team').team.count(),
+              100 * no_pres.drop_duplicates('team').team.count() / team_plan.drop_duplicates('team').team.count()))
+add_line(team_plan[team_plan.team == no_pres.iloc[0].team][cols])
+add_line(team_plan[team_plan.team == no_pres.iloc[1].team][cols])
+add_header('Распределение по типу бригад (в долях):')
+add_line(no_pres.drop_duplicates('team').team_type.value_counts(normalize=True))
+
+
+# In[83]:
+
+# print(nice_time(current_time))
+# cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state']
+# for hor in [1, 3, 6, 12]:
+#     a = team_plan[(team_plan.state == 2) & (team_plan.team_type == 'Реальная')
+#           & (team_plan.time_start > current_time) & (team_plan.time_start < current_time + hor * 3600)]\
+#         .set_index('team').sample(20)
+#     for t in a.index:
+#         print('+prev_team(id(%s),prev_plan([ready_time(%s)]))' % (t, a.ix[t].time_start))
+
+
 # <a id='pass_teams_in_plan'></a>
 # ## Проверка подвязки негрузовых бригад [ToC](#toc)
 
-# In[82]:
+# In[84]:
 
 add_header('Проверка подвязки негрузовых бригад', h=2, p=False)
 
 
-# In[83]:
+# In[85]:
 
 cols = ['team', 'ttype', 'loco_info', 'st_from_name', 'st_to_name', 'time_start_f', 'state', 'loco']
 bad_pass_teams = team_plan[(team_plan.ttype == 0) & (team_plan.loco != team_plan.loco_info) 
@@ -1252,7 +1294,7 @@ else:
 
 # ## Экспорт в HTML [ToC](#toc)
 
-# In[84]:
+# In[86]:
 
 filename = REPORT_FOLDER + 'team_report_' + time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time())) + '.html'
 create_report(filename)
