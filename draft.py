@@ -1,12 +1,12 @@
-﻿
+
 # coding: utf-8
 
-# In[6]:
+# In[18]:
 
-#get_ipython().magic('run common.py')
+get_ipython().magic('run common.py')
 
 
-# In[7]:
+# In[19]:
 
 '''
     Examples:
@@ -36,7 +36,7 @@ def get_longest_pair(st_list, lengths):
     return (sm1, sm2, m)
 
 
-# In[8]:
+# In[20]:
 
 all_lengths = pd.read_csv(FOLDER + '/mandatory/travel_times_all_pairs.csv', sep=';').set_index(['st_from_name', 'st_to_name'])
     
@@ -62,7 +62,7 @@ cols_tracks = ['team_region', 'asoup', 'depot', 'depot_name', 'st_from_name', 's
 cols_times = ['team_region', 'asoup', 'depot', 'depot_name', 'time_f', 'time_b', 'time_wr']
 
 
-# In[9]:
+# In[21]:
 
 #print(nice_time(current_time + 20*60 + 3*3600))
 nct = current_time + 20*60 + 3*3600
@@ -80,7 +80,7 @@ print(a.state.value_counts())
 print(a.team_type.value_counts())
 
 
-# In[10]:
+# In[22]:
 
 print(nice_time(current_time))
 cols = ['team', 'st_from_name', 'st_to_name', 'oper_time_f', 'time_start_norm', 'state', 'wait_ct', 'wait']
@@ -94,7 +94,7 @@ a = team_plan[(team_plan.state_info == '2')
 (a.wait - a.wait_ct).describe()
 
 
-# In[11]:
+# In[23]:
 
 st = 'ИРКУТСК-СОРТИРОВОЧНЫЙ'
 
@@ -127,36 +127,14 @@ print(teams[teams.state.isin([0, 1])].state.value_counts().to_string(), '\n-')
 print(teams[teams.state.isin([0, 1])].depot_name.value_counts().to_string())
 
 
-# In[95]:
+# In[32]:
 
-df = pd.read_csv('./input/otsev_uth_detail.csv', encoding='utf-8-sig', sep=';', 
-                 dtype={'train_id':str, 'train_index':str, 'loco_id':str, 'team_id':str}, 
-                 parse_dates=['time', 'train_time', 'loco_time', 'team_time', 'team_ready_time1', 'team_ready_time2'])                 
-print(df.columns)
+ts = ['200252616155', '200253041216']
 
 
-# In[97]:
+# In[37]:
 
 print(nice_time(current_time))
-cols = ['uns', 'team_id', 'out',
-        'team_type_name', 'team_time',
-                                'team_ready_time1', 'team_ready_time2']
-df['delta1'] = df.team_ready_time1 - df.team_time
-nice_print(df[df.team_type_asoup_id == 54].sort_values('delta1')[cols].head())
-
-
-# In[103]:
-
-team_info['depot_time_f'] = team_info.depot_time.apply(nice_time)
-team_info['return_time_f'] = team_info.return_time.apply(nice_time)
-nice_print(team_info[team_info.team == '200200256743'][['team', 'oper_time_f', 'loc_name', 'depot_time_f', 'return_time_f']])
-
-
-# In[102]:
-
-m1 = team_info[(team_info.depot_time == -1) 
-          & (team_info.return_time == -1)][['team', 'oper_time_f', 'loc_name', 'depot_time_f', 'return_time_f']]
-
-with pd.option_context('display.max_colwidth', 40):
-    nice_print(df[df.team_id.isin(m1.team)][cols])
+import datetime as dt
+dt.datetime.fromtimestamp(1469296440)
 
