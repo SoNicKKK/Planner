@@ -1,17 +1,17 @@
-
+﻿
 # coding: utf-8
 
 # In[483]:
 
 FOLDER = 'resources/'
-PRINT = True
+PRINT = False
 
 
 # In[484]:
 
-get_ipython().magic('run html_export.py')
-get_ipython().magic('run common.py')
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('run html_export.py')
+#get_ipython().magic('run common.py')
+#get_ipython().magic('matplotlib inline')
 
 
 # In[485]:

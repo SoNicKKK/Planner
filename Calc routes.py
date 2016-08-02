@@ -92,6 +92,30 @@ g.add_weighted_edges_from(list(zip(cost.st_from_name, cost.st_to_name, cost.cost
 print('NetworkX граф создан')
 
 
+# In[30]:
+
+slot = pd.read_csv(FOLDER + 'slot.csv')
+slot['st_from_name'] = slot.st_from.map(st_names.name)
+slot['st_to_name'] = slot.st_to.map(st_names.name)
+slot['link_name'] = list(zip(slot.st_from_name, slot.st_to_name))
+slot['tt'] = slot.time_end - slot.time_start
+slot_tts = slot.groupby('link_name').tt.mean()
+
+links = pd.read_csv(FOLDER + 'link.csv')
+links['st_from_name'] = links.st_from.map(st_names.name)
+links['st_to_name'] = links.st_to.map(st_names.name)
+links['link_name'] = list(zip(links.st_from_name, links.st_to_name))
+links['slot_tt'] = links.link_name.map(slot_tts)
+links.slot_tt.fillna(links.time, inplace=True)
+links['slot_tt'] = links.slot_tt.apply(int)
+
+g_tt = nx.DiGraph()
+g_tt.add_nodes_from(all_stations)
+g_tt.add_weighted_edges_from(list(zip(links.st_from_name, links.st_to_name, links.slot_tt)))
+ap_len = nx.all_pairs_dijkstra_path_length(g_tt)
+pd.DataFrame(ap_len).to_csv('travel_times.csv')
+
+
 # In[4]:
 
 def get_path(df_cost, col_cost, suffix, st_from, st_to, details=False):
