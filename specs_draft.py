@@ -431,7 +431,7 @@ train_times = list(df_slot.ts.values)
 df[train_list] = df.apply(lambda x: prev_util(x), axis=1)
 
 
-# In[54]:
+# In[69]:
 
 import seaborn as sns
 import matplotlib
@@ -442,12 +442,12 @@ def draw(df, df_slot):
     cmap = matplotlib.cm.rainbow
     for i in range(len(df.index)):
         plt.plot(df_slot.ts - sd, df.ix[i][train_list], label='%d - %s' % (i, df.ix[i]['name']), color=cmap(i / float(team_num)))
-        plt.scatter(df.ix[i].ts - sd, 3.0, color=cmap(i / float(team_num)), s=50)
+        plt.scatter(df.ix[i].ts - sd, 0.0, color=cmap(i / float(team_num)), s=50)
 
     plt.xlabel('Время готовности поезда')
     plt.ylabel('Значение ФП')
     for t in df_slot.ts.values:
-        plt.plot([t - sd] * 100, np.linspace(0, 2.5, 100), 'r--', lw=0.5)
+        plt.plot([t - sd] * 100, np.linspace(0, 1.5, 100), 'r--', lw=0.5)
 
     plt.legend(loc='best', frameon=True)
     plt.tight_layout()
@@ -471,7 +471,7 @@ draw(df, df_slot)
 # 2. Далее для каждой пары <поезд, бригада> полезность считается по формуле: $$U_{i,T} = \exp\left(-\Delta^2\right), \quad \Delta = \frac{t_i - t_T}{3600}$$, где $t_i$ - обновленное время готовности поезда, $t_T$ - обновленное время готовности бригады.
 # 3. График данной функции показан на рисунке ниже. Видно, что максимум достигается при совпадении времен поезда и бригады. После проведенных нормировки и смещения большие значения ФП будет принимать в тех случаях, когда номер бригады (по порядку) примерно будет совпадать с номером поезда (по порядку). При сильно различающихся количествах бригад и поездов возможны некоторые сдвиги относительно такой симметрии, но они кажутся допустиыми. Значение ФП по этому критерию ограничено сверху единицей.
 
-# In[55]:
+# In[70]:
 
 x = np.linspace(-4, 4, 1000)
 y = np.exp(-x**2)
@@ -482,7 +482,7 @@ plt.legend(frameon=True)
 plt.show()
 
 
-# In[59]:
+# In[71]:
 
 def get_util(x):
     u = []
@@ -510,7 +510,7 @@ df[train_list] = df.apply(lambda x: get_util(x), axis=1)
 draw(df, df_slot)
 
 
-# In[60]:
+# In[72]:
 
 from scipy import optimize
 row, col = optimize.linear_sum_assignment(-df[train_list].as_matrix())
