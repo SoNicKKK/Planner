@@ -10,6 +10,8 @@ resources/*.xlsx
 resources/others/
 resources/mandatory/paths.csv
 test/
+release_scripts/
+test_scenario/
 .ipynb_checkpoints/
 
 # Byte-compiled / optimized / DLL files

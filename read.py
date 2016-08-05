@@ -20,6 +20,7 @@
 #     1. [Атрибуты бригад](#team_attributes)
 #     2. [Местоположение и состояние бригад](#fact_team_location)
 #     3. [Последние явки и время начала отдыха бригад](#fact_team_ready)
+#     4. [Явки бригад, запланированные на предыдущем расчете](#Явки-бригад,-запланированные-на-предыдущем-расчете)
 #   4. [Нормативно-справочная информация](#nsi)
 #     1. [Станции и пункты проведения ТО](#station)
 #     2. [Участки планирования](#)
@@ -44,7 +45,7 @@
 # 6. [Выгрузка результатов в csv-файлы](#save_csv)
 #   1. [Создание вспомогательного файла с названиями серий](#series)
 
-# In[116]:
+# In[53]:
 
 import sys
 if len(sys.argv) > 1:
@@ -58,20 +59,23 @@ else:
 print('Load data from file "%s"' % file_name)
 
 
-# In[117]:
+# In[54]:
 
 import pandas as pd
 import numpy as np
 import re, time
 
 
-# In[118]:
+# In[55]:
 
 start_time = time.time()
 FOLDER = 'resources/'
 
 
-# In[119]:
+# In[56]:
+
+# Эта секция делает прогресс бар для чтения файла или чего угодно другого. На функциональность никак не влияет.
+# При запуске из командной строки питон ругается на виджеты и IPython, поэтому тут все закомментировано.
 
 # def log_progress(sequence, every=None, size=None):
 #     from ipywidgets import IntProgress, HTML, VBox
@@ -125,53 +129,65 @@ FOLDER = 'resources/'
 
 # <a id='dict'></a>
 # ## Подготовка словарей для хранения данных [ToC](#toc)
+# 
+# Все данные, прочитанные из лога, хранятся в трех словарях:
+# * `entities_data` - сырые, никак не обработанные данные, просто строки из лога. Различаются по префиксу (от символа '+' до открывающей скобки), кладутся в списки по соответствующему ключу.
+# * `entities_df_source` - атрибуты строк, распарсенные из строк из `entities_data`. Набор атрибутов для каждого ключа перечислен в словаре `entities_cols`.
+# * `entities_df` - готовые датафреймы с данными.
 
 # <a id='cols'></a>
 # ### Поля сущностей [ToC](#toc)
 
-# In[120]:
+# In[57]:
 
-entities_cols = {  'link'                  :['link', 'st_from', 'st_to', 'time', 'dist', 'dir', 'lines', 'road'],
-                   'station'               :['station', 'loco_region','norm_time'],
+entities_cols = {  'current_time'          :['current_time'],
+                 # Дополнительные данные: названия станций, номера поездов, локомотивов и бригад
                    'station_names'         :['station', 'name', 'esr'],
                    'train_index'           :['train', 'index', 'ind434'],
                    'team_nums'             :['team', 'number'],
-                   'loco_nums'             :['loco', 'number'],
+                   'loco_nums'             :['loco', 'number'],    
                    'support'               :[],
-                   'loco_tonnage'          :['series', 'sections', 'link', 'st_from', 'st_to', 'max_weight'],
-                   'task'                  :['id', 'time_start', 'time_end', 'st_from', 'st_next', 'st_to', 'number'],
-                   'train_info'            :['train', 'number', 'weight', 'length', 'start_st', 'end_st', 'joint'],
-                   'slot_train'            :['train', 'st_from', 'st_to', 'link', 'time_start', 'time_end'],
-                   'loco_attributes'       :['loco', 'series', 'regions', 'depot', 'sections', 'ltype', 'power_type'],
-                   'slot_loco'             :['loco', 'st_from', 'st_to', 'link', 'time_start', 'time_end', 'state', 'train'],
-                   'team_attributes'       :['team', 'regions', 'depot', 'long', 'heavy', 'series', 'fake', 'ttype'],
-                   'fact_team_ready'       :['team', 'ready_type', 'depot_st', 'depot_time', 
-                                             'return_st', 'return_time', 'rest_time'],
-                   'slot_team'             :['team', 'st_from', 'st_to', 'link', 'time_start', 'time_end', 
-                                             'slot', 'state', 'loco'], 
-                   'slot'                  :['slot', 'st_from', 'st_to', 'link', 'time_start', 'time_end'],
-                   'slot_pass'             :['slot', 'st_from', 'st_to', 'link', 'time_start', 'time_end'],
-                   'routes'                :['train', 'st_from', 'st_to'],
+                 # Нормативно-справочная информация
+                   'link'                  :['link', 'st_from', 'st_to', 'time', 'dist', 'dir', 'lines', 'road'],
+                   'station'               :['station', 'loco_region','norm_time'],                                      
                    'service'               :['station', 'serv_type', 'duration'],
+                   'loco_tonnage'          :['series', 'sections', 'link', 'st_from', 'st_to', 'max_weight'],
+                   'team_work_region'      :['twr', 'link'],
+                   'team_region'           :['team_region', 'asoup', 'depot', 'st_from', 'st_to', 'time_f', 'time_b', 'time_wr'],
+                   'service_station'       :['station', 'stype', 'series', 'sections', 'ptype', 'priority', 'duration'],
+                   'task'                  :['id', 'time_start', 'time_end', 'st_from', 'st_next', 'st_to', 'number'],
+                 # Атрибуты поездов
+                   'train_info'            :['train', 'number', 'weight', 'length', 'start_st', 'end_st', 'joint'],
                    'train_oper'            :['train', 'oper', 'oper_time', 'oper_location', 'st_from', 'st_to'],
                    'train_depart'          :['train', 'st_from', 'st_to', 'oper_time'],
                    'train_arrive'          :['train', 'oper_location', 'oper_time'],
                    'train_ready'           :['train', 'oper_location', 'oper_time'],
-                   'fact_loco'             :['loco', 'oper', 'oper_time', 'oper_location', 
-                                             'st_from', 'st_to', 'state', 'train'],
+                   'routes'                :['train', 'st_from', 'st_to'],
+                 # Атрибуты локомотивов
+                   'loco_attributes'       :['loco', 'series', 'regions', 'depot', 'sections', 'ltype', 'power_type'],
+                   'fact_loco'             :['loco', 'oper', 'oper_time', 'oper_location', 'st_from', 'st_to', 'state', 'train'],
                    'fact_loco_next_service':['loco', 'dts', 'tts'],
-                   'fact_team_location'    :['team', 'oper_time', 'oper_location', 'st_from', 'st_to', 'state', 'loco'],
                    'loco_info_regs'        :['loco', 'region'],
-                   'team_work_region'      :['twr', 'link'],
-                   'team_region'           :['team_region', 'asoup', 'depot', 'st_from', 'st_to', 'time_f', 'time_b', 'time_wr'],
-                   'service_station'       :['station', 'stype', 'series', 'sections', 'ptype', 'priority', 'duration'],
-                   'current_time'          :['current_time']}
+                 # Атрибуты бригад
+                   'team_attributes'       :['team', 'regions', 'depot', 'long', 'heavy', 'series', 'fake', 'ttype', 'uth'],
+                   'fact_team_ready'       :['team', 'ready_type', 'depot_st', 'depot_time', 'return_st', 'return_time',
+                                             'rest_time'],
+                   'fact_team_location'    :['team', 'oper_time', 'oper_location', 'st_from', 'st_to', 'state', 'loco'],
+                   'prev_team'             :['team', 'prev_ready_time'],
+                 # Нитки вариантного графика
+                   'slot'                  :['slot', 'st_from', 'st_to', 'link', 'time_start', 'time_end'],
+                   'slot_pass'             :['slot', 'st_from', 'st_to', 'link', 'time_start', 'time_end'],
+                 # Результаты планирования
+                   'slot_train'            :['train', 'st_from', 'st_to', 'link', 'time_start', 'time_end'],
+                   'slot_loco'             :['loco', 'st_from', 'st_to', 'link', 'time_start', 'time_end', 'state', 'train'],
+                   'slot_team'             :['team', 'st_from', 'st_to', 'link', 'time_start', 'time_end', 
+                                             'slot', 'state', 'loco']}
 
 
 # <a id='data'></a>
 # ### Словари для строк из файла, списков с данными и датафреймов [ToC](#toc)
 
-# In[121]:
+# In[58]:
 
 entities_data = {}
 for key in entities_cols.keys():
@@ -189,7 +205,7 @@ for key in entities_cols.keys():
 # <a id='read'></a>
 # ## Загрузка строк из файла [ToC](#toc)
 
-# In[122]:
+# In[59]:
 
 def simplecount(filename):
     lines = 0
@@ -200,7 +216,7 @@ def simplecount(filename):
 n = simplecount(file_name)
 
 
-# In[123]:
+# In[60]:
 
 with open(file_name, encoding = 'utf_8_sig') as f:    
     #for line in log_progress(f, every = 1000, size=n):
@@ -226,7 +242,7 @@ print(sorted((key, len(entities_data[key])) for key in entities_cols.keys()))
 # <a id='train_info'></a>
 # #### Атрибуты и маршруты поездов [ToC](#toc)
 
-# In[124]:
+# In[61]:
 
 entities_df_source['train_info'] = []
 entities_df_source['routes'] = []
@@ -255,7 +271,7 @@ for line in entities_data['train_info']:
 # <a id='train_oper'></a>
 # #### Операции с поездами (поездные факты) [ToC](#toc)
 
-# In[125]:
+# In[62]:
 
 entities_df_source['train_oper'] = []
 
@@ -283,7 +299,7 @@ for line in entities_data['train_ready']:
 # <a id='loco_attributes'></a>
 # #### Атрибуты локомотивов и тяговые плечи [ToC](#toc)
 
-# In[157]:
+# In[63]:
 
 entities_df_source['loco_attributes'] = []
 entities_df_source['loco_info_regs'] = []
@@ -313,7 +329,7 @@ for line in entities_data['loco_attributes']:
 # <a id='fact_loco'></a>
 # #### Местоположение локомотивов (локомотивные факты) [ToC](#toc)
 
-# In[127]:
+# In[64]:
 
 entities_df_source['fact_loco'] = []
 
@@ -339,7 +355,7 @@ for line in entities_data['fact_loco']:
 # <a id='fact_loco_next_service'></a>
 # #### Время и пробег до ТО-2 [ToC](#toc)
 
-# In[128]:
+# In[65]:
 
 entities_df_source['fact_loco_next_service'] = []
 
@@ -357,25 +373,25 @@ for line in entities_data['fact_loco_next_service']:
 # <a id='team_attributes'></a>
 # #### Атрибуты бригад [ToC](#toc)
 
-# In[129]:
+# In[66]:
 
 entities_df_source['team_attributes'] = []
 a = []
 for line in entities_data['team_attributes']:                       
-    k = re.split('(attributes|team_work_regions|depot|loco_series|long_train|heavy_train|fake|type)', line)    
+    k = re.split('(attributes|team_work_regions|depot|loco_series|long_train|heavy_train|fake|type|uth)', line)    
     team = k[2][4:-2]
     regions_str = k[6][2:-3].split(',')
     regions = []
     for reg in regions_str:
         regions.append(reg[3:-1])                      
 
-    depot, long, heavy, fake = k[8][9:-3], k[12][1], k[14][1], k[16][1]
+    depot, long, heavy, fake, ttype = k[8][9:-3], k[12][1], k[14][1], k[16][1], k[18][1]
     series = list(np.unique([x[3:-1] for x in k[10][2:-3].split(',')]))    
-    if len(k)>18:
-        ttype = k[18][1]
+    if len(k) > 20:
+        uth = k[20][1]
     else:
-        ttype = 'none'
-    entities_df_source['team_attributes'].append([team, regions, depot, long, heavy, series, fake, ttype])
+        uth = 0
+    entities_df_source['team_attributes'].append([team, regions, depot, long, heavy, series, fake, ttype, uth])
     
 #entities_df_source['team_attributes'][:3]
 
@@ -383,7 +399,7 @@ for line in entities_data['team_attributes']:
 # <a id='fact_team_location'></a>
 # #### Местоположение и состояние бригад [ToC](#toc)
 
-# In[130]:
+# In[67]:
 
 entities_df_source['fact_team_location'] = []
 
@@ -405,7 +421,7 @@ for line in entities_data['fact_team_location']:
 # <a id='fact_team_ready'></a>
 # #### Последние явки и время начала отдыха бригад [ToC](#toc)
 
-# In[131]:
+# In[68]:
 
 entities_df_source['fact_team_ready'] = []
 
@@ -421,13 +437,28 @@ for line in entities_data['fact_team_ready']:
 #print(entities_df_source['fact_team_ready'][:3])
 
 
+# #### Явки бригад, запланированные на предыдущем расчете
+
+# In[69]:
+
+entities_df_source['prev_team'] = []
+
+for line in entities_data['prev_team']:
+    a = line.split(',')
+    team = a[0][14:-1]
+    prev_time = a[1][22:-5]
+    entities_df_source['prev_team'].append([team, prev_time])
+    
+#print(entities_df_source['prev_team'][:10])
+
+
 # <a id='nsi'></a>
 # ### Нормативно-справочная информация [ToC](#toc)
 
 # <a id='station'></a>
 # #### Станции и пункты проведения ТО [ToC](#toc)
 
-# In[132]:
+# In[70]:
 
 entities_df_source['station'] = []
 entities_df_source['service'] = []
@@ -451,7 +482,7 @@ for line in entities_data['station']:
 # <a id='link'></a>
 # #### Участки планирования [ToC](#toc)
 
-# In[133]:
+# In[71]:
 
 entities_df_source['link'] = []
 
@@ -469,7 +500,7 @@ for line in entities_data['link']:
 # <a id='team_region'></a>
 # #### Участки обращения бригад (УОЛБ) [ToC](#toc)
 
-# In[134]:
+# In[72]:
 
 entities_df_source['team_region'] = []
 
@@ -495,7 +526,7 @@ for line in entities_data['team_region']:
 # <a id='team_work_region'></a>
 # #### Участки обкатки бригад [ToC](#toc)
 
-# In[135]:
+# In[73]:
 
 entities_df_source['team_work_region'] = []
 
@@ -514,7 +545,7 @@ for line in entities_data['team_work_region']:
 # <a id='loco_tonnage'></a>
 # #### Весовые нормы локомотивов [ToC](#toc)
 
-# In[136]:
+# In[74]:
 
 entities_df_source['loco_tonnage'] = []
 
@@ -534,7 +565,7 @@ for line in entities_data['loco_tonnage']:
 # <a id='task'></a>
 # #### Задания на поезда своего формирования из ССП [ToC](#toc)
 
-# In[137]:
+# In[75]:
 
 entities_df_source['task'] = []
 
@@ -561,7 +592,7 @@ for line in entities_data['task']:
 # <a id='slot_pass'></a>
 # #### Пассажирские нитки вариантного графика [ToC](#toc)
 
-# In[138]:
+# In[76]:
 
 entities_df_source['slot_pass'] = []
 
@@ -580,7 +611,7 @@ for line in entities_data['slot_pass']:
 # <a id='slot'></a>
 # #### Грузовые нитки вариантного графика [ToC](#toc)
 
-# In[139]:
+# In[77]:
 
 entities_df_source['slot'] = []
 
@@ -599,7 +630,7 @@ for line in entities_data['slot']:
 # <a id='service_station'></a>
 # #### Станции ПТОЛ [ToC](#toc)
 
-# In[140]:
+# In[78]:
 
 entities_df_source['service_station'] = []
 
@@ -620,7 +651,7 @@ for line in entities_data['service_station']:
 # <a id='support'></a>
 # #### Вспомогательная информация (индексы поездов, номера локомотивов, бригад, названия и коды станций [ToC](#toc)
 
-# In[141]:
+# In[79]:
 
 entities_df_source['support'] = []
 
@@ -661,7 +692,7 @@ for line in entities_data['support']:
 # <a id='current_time'></a>
 # #### Время начала планирования [ToC](#toc)
 
-# In[142]:
+# In[80]:
 
 entities_df_source['current_time'] = []
 for line in entities_data['current_time']:
@@ -677,7 +708,7 @@ for line in entities_data['current_time']:
 # <a id='slot_train'></a>
 # #### Планы по поездам [ToC](#toc)
 
-# In[143]:
+# In[81]:
 
 entities_df_source['slot_train'] = []
 
@@ -696,7 +727,7 @@ for line in entities_data['slot_train']:
 # <a id='slot_loco'></a>
 # #### Планы по локомотивам [ToC](#toc)
 
-# In[144]:
+# In[82]:
 
 entities_df_source['slot_loco'] = []
 
@@ -716,7 +747,7 @@ for line in entities_data['slot_loco']:
 # <a id='slot_team'></a>
 # #### Планы по бригадам [ToC](#toc)
 
-# In[145]:
+# In[83]:
 
 entities_df_source['slot_team'] = []
 
@@ -737,7 +768,7 @@ for line in entities_data['slot_team']:
 # <a id='create_df'></a>
 # ## Создание датафреймов [ToC](#toc)
 
-# In[146]:
+# In[84]:
 
 for key in entities_df.keys():
     try:
@@ -754,7 +785,7 @@ for key in entities_df.keys():
 # <a id='merge_station'></a>
 # #### Добавление кодов и названий станций в station [ToC](#toc)
 
-# In[147]:
+# In[85]:
 
 for col in entities_cols['station_names']:
     if col != 'station':
@@ -764,7 +795,7 @@ for col in entities_cols['station_names']:
 # <a id='merge_train'></a>
 # #### Добавление индекса и операций с поездами в train_info [ToC](#toc)
 
-# In[148]:
+# In[86]:
 
 # Если по поезду в train_oper несколько операций, то оставляем только последнюю по времени
 # Если последних операций тоже несколько, то оставляем в таком порядке: сначала depart - потом ready - потом arrive
@@ -782,7 +813,7 @@ entities_df['train_oper'].sort_values(['train', 'oper_time', 'oper_code'])
 entities_df['train_oper'] = entities_df['train_oper'].sort_values(['train', 'oper_time', 'oper_code'])                                                     .drop_duplicates(subset=['train'], keep='last')                                                     .drop('oper_code', axis=1)
 
 
-# In[149]:
+# In[87]:
 
 if 'ind434' not in entities_df['train_info'].columns:
     entities_df['train_info'] = entities_df['train_info'].set_index('train')                                .join(entities_df['train_index'].set_index('train')).reset_index()
@@ -795,7 +826,7 @@ if 'oper_time' not in entities_df['train_info'].columns:
 # <a id='merge_loco'></a>
 # #### Добавление номера, местоположения и времени до ТО в loco_attributes [ToC](#toc)
 
-# In[150]:
+# In[88]:
 
 entities_df['loco_attributes']['number'] = entities_df['loco_attributes'].loco                                        .map(entities_df['loco_nums'].drop_duplicates('loco').set_index('loco').number)
 
@@ -809,7 +840,7 @@ if 'oper_time' not in entities_df['loco_attributes'].columns:
 # <a id='merge_team'></a>
 # #### Добавление номера, местоположения, состояния и информации по явке в team_attributes [ToC](#toc)
 
-# In[151]:
+# In[89]:
 
 entities_df['team_attributes']['number'] = entities_df['team_attributes'].team                                            .map(entities_df['team_nums'].drop_duplicates('team').set_index('team').number)
 
@@ -824,7 +855,7 @@ if 'oper_time' not in entities_df['team_attributes'].columns:
 # <a id='save_csv'></a>
 # ## Выгрузка результатов в csv-файлы [ToC](#toc)
 
-# In[152]:
+# In[90]:
 
 TEST_FOLDER = 'test/'
 
@@ -837,7 +868,7 @@ for key in entities_df.keys():
 # <a id='series'></a>
 # #### Создание вспомогательного файла с названиями серий [ToC](#toc)
 
-# In[153]:
+# In[91]:
 
 ser_id, ser_name, ser_desc = [], [], []
 cnt = 1
@@ -862,7 +893,7 @@ series['ser_type'] = series.ser_name.apply(lambda x: 'Электровоз' if a
 series.to_csv(FOLDER + 'loco_series.csv', index=False, encoding='utf-8')
 
 
-# In[154]:
+# In[92]:
 
 t = time.time() - start_time
 print('Общее время выполнения: %.2f сек.' % t)

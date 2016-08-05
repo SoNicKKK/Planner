@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # In[1]:
@@ -405,7 +405,7 @@ if ZIP:
 res_to_index_start_with_0[res_to_index_start_with_0['В плане?'] == 'Нет']['Номер'].unique()
 
 
-# In[31]:
+# In[26]:
 
 print(nice_time(current_time))
 arr = [9205000078, 9205007670, 9205002505, 9205008457, 9205006890, 9205003873, 9205008378, 9205008860, 9205031292, 
@@ -415,7 +415,7 @@ team_info['oper_time_f'] = team_info.oper_time.apply(nice_time)
 team_info[team_info.number.isin(arr)][cols].sort_values('state')
 
 
-# In[54]:
+# In[27]:
 
 st_name = 'ИРКУТСК-СОРТИРОВОЧНЫЙ'
 cols = ['team', 'st_from_name', 'st_to_name', 'depot_name', 'time_start_norm', 'state', 'loco', 'is_uth']
@@ -428,7 +428,7 @@ a = team_plan[(team_plan.st_from_name == st_name)
 b = a[(a.depot_name == st_name) & (a.is_uth == False)][cols]
 
 
-# In[74]:
+# In[28]:
 
 cols = ['team', 'number', 'depot', 'ready_type', 'state', 'loc_name', 'oper_time_f', 'loco', 'ttype']
 q = team_info[team_info.team.isin(b.team)][cols].sort_values('team')
@@ -438,4 +438,21 @@ filt = pd.read_csv('./input/otsev_detail.csv', sep=';',
 filt_cols = ['team_id', 'team_type_asoup_id', 'team_type_name', 'team_time']
 print(filt[(filt.team_id.isin(q.team)) & (filt.team_type_asoup_id == 31)][filt_cols].sort_values('team_id').head().to_string(index=False))
 #filt.columns
+
+
+# In[49]:
+
+# Создание входных данных с проставленным признаком uth() в сообщении +team_attributes.
+
+# def get_team_attr(x):
+#     regions = ','.join([('id(%s)' % reg) for reg in x.regions])
+#     series = ','.join([('id(%s)' % ser) for ser in literal_eval(x.series)])
+#     s = '+team_attributes(id(%s),attributes([team_work_regions([%s]),depot(station(%s)),loco_series([%s]),long_train(%s),heavy_train(%s),fake(%s),type(%s),uth(%s)]))' \
+#          % (x.team, regions, x.depot, series, x.long, x.heavy, x.fake, x.ttype, int(x.uth))
+#     return s
+
+# uth = pd.read_excel('./resources/others/' + uth_filename)
+# team_info['uth'] = team_info.number.isin(uth['Табельный номер'])
+# team_info['depot_name'] = team_info.depot.map(st_names.name)
+# team_info.apply(lambda row: get_team_attr(row), axis=1).to_csv('team_attr_uth.txt', index=False, sep=';')
 

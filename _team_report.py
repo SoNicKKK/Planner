@@ -21,36 +21,41 @@
 #   1. [Бригады, бесцельно отправляемые пассажирами](#only_pass)
 #   2. [Бригады, у которых запланирована только явка](#only_presence)
 # 15. [Проверка подвязки негрузовых бригад](#pass_teams_in_plan)
+# 16. [Проверка сохранения предыдущих времен явок](#Проверка-сохранения-предыдущих-времен-явок)
+# 17. [Проверка возврата правильных времен явок у бригад](#Проверка-возврата-правильных-времен-явок-у-бригад)
+# 18. [Проверка планирования УТХ бригад](#Проверка-планирования-УТХ-бригад)
 
 # ### Константы и настройки
 
-# In[1]:
+# In[119]:
 
-report = ''
-FOLDER = 'resources/'
-REPORT_FOLDER = 'report/'
-PRINT = True
+report = ''               # здесь будет храниться весь html-код отчета
+FOLDER = 'resources/'     # папка с csv-файлами с данными
+REPORT_FOLDER = 'report/' # папка для отчетов
+PRINT = True              # выводить ли все таблицы из отчета на печать здесь в блокноте
 
 
-# In[2]:
+# In[120]:
 
-time_format = '%b %d, %H:%M'
-def sprint(s):
-    print(s.to_string(index=False))
-    
-#def scount(df):
-#    return scount(df, df.columns[0])
-    
-def scount(df, col):
-    return df[col].drop_duplicates().count() if col in df.columns else 0
-
+TIME_FORMAT = '%b %d, %H:%M'
+'''
+    Преобразует время из timestamp в красивый формат, заданный в константе time_format
+'''
 def nice_time(t):
-    return time.strftime(time_format, time.localtime(t)) if t > 0 else ''
+    return time.strftime(TIME_FORMAT, time.localtime(t)) if t > 0 else ''
+
+def nice_print(s, **kwargs):    
+    num = kwargs['num'] if 'num' in kwargs.keys() else False
+    cols = kwargs['cols'] if 'cols' in kwargs.keys() else s.columns
+    if num:
+        print(s.reset_index()[cols].to_string())
+    else:
+        print(s[cols].to_string(index=False))
 
 
 # ### Функции для экспорта в HTML
 
-# In[3]:
+# In[121]:
 
 def add_line(line, p=PRINT):    
     global report        
@@ -66,11 +71,7 @@ def add_line(line, p=PRINT):
     elif type(line) == pd.core.series.Series:
         report += ('%s<br>' % line.to_frame().reset_index().to_html(index=False))
     else:
-        if line[:2] == '\n':
-            line_rep = line[2:]
-        else:
-            line_rep = line
-        report += ('%s<br>' % line_rep)
+        report += ('%s<br>' % line)
     
 def add_header(header, h=4, p=PRINT):
     global report
@@ -80,7 +81,7 @@ def add_header(header, h=4, p=PRINT):
 
 def add_image(filename):
     global report
-    report += ('<img src="%s" alt="%s" height="40%%">' % (filename, filename))
+    report += ('<img src="%s" alt="%s" height="30%%">' % (filename, filename))
 
 def create_report(filename):
     global report
@@ -105,7 +106,7 @@ def create_report(filename):
 
 # ## Загрузка и подготовка данных
 
-# In[4]:
+# In[122]:
 
 import numpy as np
 import pandas as pd
@@ -119,8 +120,6 @@ plt.style.use('fivethirtyeight')
 plt.rc('font', family='Times New Roman')
 
 pd.set_option('max_rows', 50)
-
-time_format = '%b %d, %H:%M'
 
 start_time = time.time()
 current_time = pd.read_csv(FOLDER + 'current_time.csv').current_time[0]
@@ -137,11 +136,11 @@ loco_series  = pd.read_csv(FOLDER + 'loco_series.csv')
 
 team_info.regions = team_info.regions.apply(literal_eval)
 st_names = stations[['station', 'name', 'esr']].drop_duplicates().set_index('station')
-print('Время составления отчета:', time.strftime(time_format, time.localtime()))
-print('Время запуска планировщика: %s (%d)' % (time.strftime(time_format, time.localtime(current_time)), current_time))
+print('Время составления отчета:', time.strftime(TIME_FORMAT, time.localtime()))
+print('Время запуска планировщика: %s (%d)' % (nice_time(current_time), current_time))
 
 
-# In[5]:
+# In[123]:
 
 # Мержим таблицы _plan и _info для поездов, локомотивов и бригад
 # Добавляем во все таблицы названия станций на маршруте и времена отправления/прибытия в читабельном формате
@@ -173,20 +172,20 @@ team_plan = team_plan.merge(team_info, on='team', suffixes=('', '_info'), how='l
 team_plan['team_type'] = team_plan.team.apply(lambda x: 'Реальная' if str(x)[0] == '2' else 'Фейковая')
 
 
-# In[6]:
+# In[124]:
 
-add_line('Время сбора данных и запуска планировщика: %s' % time.strftime(time_format, time.localtime(current_time)))
+add_line('Время сбора данных и запуска планировщика: %s' % nice_time(current_time))
 
 
 # <a id='perc_assign'></a>
 # ## Расчет процента подвязки между локомотивами и бригадами [ToC](#toc)
 
-# In[7]:
+# In[125]:
 
 add_header('Расчет процента подвязки между локомотивами и бригадами', h=2, p=False)
 
 
-# In[8]:
+# In[126]:
 
 def count_real_assign_percent(hor):
     loco_no_team = loco_plan.loc[(loco_plan.time_start < current_time + hor) &
@@ -220,38 +219,22 @@ count_assign_percent(12 * 3600)
 count_assign_percent(24 * 3600)
 
 
-# In[9]:
-
-#loco_plan['loco_time'] = list(zip(loco_plan.loco, loco_plan.time_start))
-#team_plan['loco_time'] = list(zip(team_plan.loco, team_plan.time_start))
-#loco_plan['team']
-loco_no_team = loco_plan.loc[(loco_plan.time_start < current_time + 6 * 3600) &
-                             (loco_plan.team == -1) &
-                             (loco_plan.state.isin([0, 1]))]
-#add_line(loco_no_team[['loco', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'team']].head())
-loco_id = loco_no_team.iloc[1].loco
-add_line(loco_plan[loco_plan.loco == loco_id]        [['loco', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state', 'train']])
-add_line(team_plan[team_plan.loco == loco_id].sort_values('time_start')        [['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'loco', 'state']])
-
-
 # <a id='perc_assign2'></a>
 # ## Расчет процента запланированных бригад от общего количества [ToC](#toc)
 
-# In[10]:
+# In[127]:
 
 add_header('Расчет процента запланированных бригад от общего количества бригад на входе', h=2, p=False)
 
 
-# In[11]:
+# In[128]:
 
-# team_planned = team_plan.loc[team_plan.state.isin([0, 1])]
-team_assigned = team_plan.loc[team_plan.state.isin([1])]
-team_assigned_n = len(team_assigned.drop_duplicates(subset=['team']).index)
-team_total_n = len(team_info.team.index)
+team_assigned_n = team_info[team_info.team.isin(team_plan[team_plan.state.isin([0, 1])].team)]                    .drop_duplicates('team').team.count()
+team_total_n = team_info.drop_duplicates('team').team.count()
 team_assigned_percent = team_assigned_n / team_total_n
 add_line('Всего бригад, запланированных с локомотивами в работе: %d из %d (%.2f%%)' %
       (team_assigned_n, team_total_n, 100 * team_assigned_percent))
-team_info['is_assign'] = team_info.team.isin(team_assigned.team)
+team_info['is_assign'] = team_info.team.isin(team_plan[team_plan.state.isin([0, 1])].team)
 assign_states = team_info.loc[team_info.is_assign == True, ['team', 'state']].state.astype(str).value_counts().to_frame()
 initial_states = team_info.state.value_counts().to_frame()
 initial_states.columns=['Бригады во входных данных']
@@ -259,10 +242,9 @@ assign_states.columns=['Бригады в результатах']
 states = initial_states.join(assign_states)
 states.fillna(0, inplace=True)
 
-sns.set_style("ticks")
-sns.set_context("talk")
-sns.set_color_codes("pastel")
-fig = plt.figure()
+sns.set(style='white', context='notebook')
+sns.set_color_codes('pastel')
+fig = plt.figure(figsize=(8, 4))
 sns.barplot(x='index', y='Бригады во входных данных', data=states.sort_index().reset_index(), 
             color="b", label='Бригады во входных данных')
 sns.set_color_codes('muted')
@@ -271,7 +253,7 @@ ax = sns.barplot(x='index', y='Бригады в результатах', data=s
 ax.legend(ncol=1, loc="upper right", frameon=False)
 ax.set(ylabel='Количество бригад', xlabel='Исходное состояние бригады', 
        title='Соотношение между количеством запланированных бригад и бригад на входе')
-sns.despine()
+#sns.despine()
 filename = 'team_usage.png'
 plt.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
 add_image(filename)
@@ -280,18 +262,18 @@ add_image(filename)
 # <a id='real_fake'></a>
 # ### Распределение реальных и фейковых бригад в результатах планирования
 
-# In[12]:
+# In[129]:
 
 add_header('Распределение реальных и фейковых бригад в результатах планирования', h=2, p=False)
 
 
-# In[13]:
+# In[130]:
 
-f = team_plan.drop_duplicates(subset=['team']).team_type.value_counts()
-fig = plt.figure()
-ax = f.plot(kind='pie', colormap='Pastel2', figsize=(5,5), autopct='%.2f%%')
-ax.set_ylabel('')
-#plt.show()
+f = team_plan[team_plan.state.isin([0, 1])].drop_duplicates('team').team_type.value_counts()
+fig = plt.figure(figsize=(5,5))
+colors = ['cornflowerblue', 'lightskyblue']
+expl = (0.03, 0) if len(f) == 2 else None
+plt.pie(f, autopct='%.2f%%', colors=colors, explode=expl, shadow=True, labels=list(f.index))
 filename = 'real_fake_teams_ratio.png'
 fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
 add_image(filename)
@@ -300,19 +282,19 @@ add_image(filename)
 # <a id='no_assign'></a>
 # ## Cтанции и участки, на которых не состоялась подвязка бригады [ToC](#toc)
 
-# In[14]:
+# In[131]:
 
 add_header('Станции и участки, на которых не состоялась подвязка бригады', h=2, p=False)
 
 
-# In[15]:
+# In[132]:
 
 horizon = 6 * 3600
 add_line('Горизонт анализа: %d часов' % (horizon / 3600), p=False)
 loco_mask = (loco_plan.time_start < current_time + horizon)
 
 
-# In[16]:
+# In[133]:
 
 # Добавляем признак первой станции на маршруте локомотива, где не была подвязана бригада
 loco_plan.loc[loco_plan.state == 4, 'team'] = 0
@@ -328,10 +310,10 @@ add_header('\nУчастки планирования, на которых не 
 add_line(fail_team_assign_tracks)
 
 
-# In[17]:
+# In[134]:
 
-#st_name = fail_team_assign_stations.head(1).index[0]
-st_name = 'КРАСНОЯРСК-ВОСТОЧНЫЙ'
+st_name = fail_team_assign_stations.head(1).index[0]
+#st_name = 'КРАСНОЯРСК-ВОСТОЧНЫЙ'
 bad_locos = loco_plan.loc[loco_mask & (loco_plan.st_from_name == st_name) & (loco_plan.no_team_start == True)]
 if not bad_locos.empty:
     add_header('Локомотивы, к которым не была подвязана бригада на станции %s, по направлениям:' % st_name)
@@ -341,21 +323,21 @@ if not bad_locos.empty:
 # <a id='overwork'></a>
 # ## Проверка переработки бригад [ToC](#toc)
 
-# In[18]:
+# In[135]:
 
 add_header('Бригады с переработкой', h=2, p=False)
 
 
 # #### Вычисляем последнее время явки для каждого участка на маршруте
 
-# In[19]:
+# In[136]:
 
 # В поле presence прописываем последнюю явку бригады из входных данных
 team_info['all_presence'] = list(zip(team_info.depot_time, team_info.return_time))
 team_info['presence'] = team_info.all_presence.apply(lambda x: max(x))
-team_info['presence_norm'] = team_info.presence.apply(lambda x: time.strftime(time_format, time.localtime(x)) if x>0 else x)
+team_info['presence_norm'] = team_info.presence.apply(nice_time)
 team_plan['info_presence'] = team_plan.team.map(team_info.set_index('team').presence)
-team_plan['info_presence_norm'] = team_plan.info_presence            .apply(lambda x: time.strftime(time_format, time.localtime(x)) if x>0 else x)
+team_plan['info_presence_norm'] = team_plan.info_presence.apply(nice_time)
 team_plan['info_presence'] = team_plan.info_presence.apply(lambda x: [] if np.isnan(x) else [int(x)])
 
 # Собираем все запланированные явки бригады. 
@@ -369,7 +351,7 @@ team_plan.plan_presence.fillna(0, inplace=True)
 team_plan['plan_presence'] = team_plan.plan_presence.apply(lambda x: [] if (type(x) == int) else x)
 
 
-# In[20]:
+# In[137]:
 
 def get_curr_presence(row):
     real_presence = np.concatenate([row.info_presence, row.plan_presence])   
@@ -386,14 +368,14 @@ def get_curr_presence(row):
     
     
 team_plan['curr_presence'] = team_plan.apply(lambda row: get_curr_presence(row), axis=1)
-cols = ['team', 'st_from_name', 'time_start', 'state', 'info_presence', 'info_presence_norm', 
-        'plan_presence', 'fake_plan_presence', 'curr_presence']
-team_plan[team_plan.team == '777700001868'][cols]
+#cols = ['team', 'st_from_name', 'time_start', 'state', 'info_presence', 'info_presence_norm', 
+#        'plan_presence', 'fake_plan_presence', 'curr_presence']
+#team_plan[team_plan.team == '777700001868'][cols]
 
 
 # #### Составляем таблицу team_trips с поездками бригад
 
-# In[21]:
+# In[138]:
 
 cols = ['team', 'state', 'st_from_name', 'st_to_name', 'time_start', 'time_end', 'loco', 'start_trip', 'end_trip', 
         'start_trip_time', 'end_trip_time']
@@ -409,22 +391,22 @@ frames = [start_trips.reset_index()[['team', 'state', 'st_from_name', 'start_tri
 team_trips = pd.concat(frames, axis=1, ignore_index=True)
 team_trips.columns = ['team', 'state', 'st_from_name', 'time_start', 'st_to_name', 'time_end', 'curr_presence']
 add_info(team_trips)
-team_trips['curr_presence_norm'] = team_trips.curr_presence.apply(lambda x: time.strftime(time_format, time.localtime(x)))
+team_trips['curr_presence_norm'] = team_trips.curr_presence.apply(nice_time)
 
 
-# In[22]:
+# In[139]:
 
 team_trips[team_trips.team == '777700001868']
 
 
 # #### Загружаем нормы рабочего времени и составляем таблицу по нормам для каждой бригады
 
-# In[23]:
+# In[140]:
 
 WORK_TIME_LIMIT = 11 #hours
 
 
-# In[24]:
+# In[141]:
 
 def get_cmp(row):
     d, l = row.depot, row.link    
@@ -454,7 +436,7 @@ team_links['time_wr'] = team_links.tr_depot.map(team_region.drop_duplicates('tr_
 #team_links.head()
 
 
-# In[25]:
+# In[142]:
 
 time_limit = team_links[['team', 'time_f', 'time_b', 'time_wr']]
 time_limit.head()
@@ -462,7 +444,7 @@ time_limit.head()
 
 # #### Вычисляем переработки, предварительно удалив выбросы
 
-# In[26]:
+# In[143]:
 
 cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'curr_presence_norm']
 outliers = team_trips[team_trips.curr_presence < current_time - 24 * 3600]
@@ -472,7 +454,7 @@ add_header('Всего %d бригад с явно некорретными (б�
 add_line(outliers.sort_values('curr_presence_norm').head(10 if outliers_n > 20 else outliers_n)[cols])
 
 
-# In[27]:
+# In[144]:
 
 pd.set_option('display.max_colwidth', 25)
 # Оставляем только корректные бригады
@@ -484,7 +466,7 @@ team_trips.time_limit_no_rest.fillna(WORK_TIME_LIMIT * 3600, inplace=True)
 team_trips[['team', 'st_from_name', 'st_to_name', 'curr_presence_norm', 'time_start_f', 'time_end_f', 'time_limit', 'time_limit_no_rest']].head()
 
 
-# In[28]:
+# In[145]:
 
 team_trips['work_time'] = np.round(((team_trips.time_end - team_trips.curr_presence) / 3600), 2)
 #team_trips['overtime'] = team_trips.work_time.apply(lambda x: np.max([x - WORK_TIME_LIMIT, 0]))
@@ -495,7 +477,7 @@ add_header('Количество бригад с переработкой (по�
 add_line(pd.cut(team_trips.overtime, bins=np.arange(int(team_trips.overtime.max()) + 2), include_lowest=False)      .value_counts().head(10).sort_index())
 
 
-# In[29]:
+# In[146]:
 
 pd.set_option('display.max_colwidth', 25)
 cols = ['team', 'st_from_name', 'st_to_name', 'curr_presence_norm', 'time_start_f', 'time_end_f', 'overtime' ]
@@ -507,7 +489,7 @@ team_trips['team_type'] = team_trips.team.map(team_plan.drop_duplicates('team').
 add_line(team_trips.loc[team_trips.overtime > 2].team_type.value_counts())
 
 
-# In[30]:
+# In[147]:
 
 team_ids = team_trips.loc[team_trips.overtime > 2].sort_values('overtime', ascending=False).team.values[:3]
 #team_id = '777700001868'
@@ -523,20 +505,18 @@ for team_id in team_ids:
     add_line('')
 
 
-# In[31]:
+# In[148]:
 
-sns.set_style('whitegrid')
-sns.set_context('notebook')
-sns.set_color_codes('dark')
-fig = plt.figure()
+fig = plt.figure(figsize=(8, 3))
+sns.set(style='whitegrid', context='notebook')
 to_hist = team_trips.loc[team_trips.overtime > 0].overtime
-ax = sns.distplot(to_hist, bins=20, color='b', hist=False, kde_kws={'shade':True})
+sns.kdeplot(to_hist, shade=True)
 title = '''Бригады с переработкой
 (среднее время переработки %.2f ч., медиана %.2f ч.)
 (всего %d бригад с переработкой более 2 часов)''' % \
             (to_hist.mean(), to_hist.median(), len(team_trips.loc[team_trips.overtime > 2].index))
-ax.set(title=title, xlabel='Переработка (час)')
-#sns.despine()
+plt.title(title)
+plt.xlabel('Переработка (час)')
 filename = 'team_overwork.png'
 fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
 add_image(filename)
@@ -545,14 +525,14 @@ add_image(filename)
 # <a id='leaps'></a>
 # ## Скачки по станциям на маршруте бригад [ToC](#toc)
 
-# In[32]:
+# In[149]:
 
 add_header('Скачки по станциям на маршруте бригад', h=2, p=False)
 
 
 # ### Скачки внутри планируемого маршрута бригад
 
-# In[33]:
+# In[150]:
 
 pd.set_option('display.max_colwidth', 20)
 team_cols = ['team', 'st_from_name', 'st_to_name', 'next_st', 'time_start_f', 'time_end_f', 'state', 'state_info']
@@ -581,7 +561,7 @@ if not team_leaps.empty:
 
 # ### Скачки между станцией исходного местоположения и первой станцией планирования
 
-# In[34]:
+# In[151]:
 
 team_info.loc[team_info.st_from != '-1', 'first_station'] = team_info.loc[team_info.st_from != '-1', 'st_from']
 team_info.loc[team_info.st_from == '-1', 'first_station'] = team_info.loc[team_info.st_from == '-1', 'oper_location']
@@ -596,7 +576,7 @@ start_leaps = team_starts[((team_starts.first_station.isnull() == False) & (team
             ((team_starts.next_station.isnull() == False) & (team_starts.st_to != team_starts.next_station))]
 
 
-# In[35]:
+# In[152]:
 
 cols = ['team', 'st_from_name', 'st_to_name', 'loco', 'first_st_name', 'next_st_name', 'loco_info']
 first_st_leaps = team_starts[(team_starts.first_station.isnull() == False) & (team_starts.next_station.isnull())
@@ -607,7 +587,7 @@ add_header('\nБригады со скачками между станцией �
 add_line(first_st_leaps[cols].head(10))
 
 
-# In[36]:
+# In[153]:
 
 cols = ['team', 'st_from_name', 'st_to_name', 'loco', 'first_st_name', 'next_st_name', 'loco_info', 'train']
 loco_info['train_number'] = loco_info.train.map(train_info.drop_duplicates('train').set_index('train').number)
@@ -623,14 +603,14 @@ add_line(next_st_leaps[cols].head(10))
 # <a id='stop_time'></a>
 # ## Анализ времен стоянок локомотивов для смены бригады [ToC](#toc)
 
-# In[37]:
+# In[154]:
 
 add_header('Анализ времен стоянок локомотивов для смены бригады', h=2, p=False)
 
 
 # #### Распределение времен стоянок для смены бригады
 
-# In[38]:
+# In[155]:
 
 # Смена бригады без стоянки локомотива
 cols = ['loco', 'st_from_name', 'st_to_name', 'time_start', 'time_end', 'team', 'time_start_next', 'loco_finish', 'stop_time']
@@ -643,17 +623,13 @@ teams_trip = pd.concat([start_teams, end_teams], axis=1)
 teams_trip['time_start_next'] = teams_trip.time_start.shift(-1)
 teams_trip['loco_finish'] = teams_trip.loco != teams_trip.loco.shift(-1)
 teams_trip.loc[teams_trip.loco_finish == False, 'stop_time'] = teams_trip.time_start_next - teams_trip.time_end
-sns.set_style('ticks')
-sns.set_context('talk')
-sns.set_color_codes('dark')
-fig = plt.figure()
+sns.set(style='whitegrid', context='notebook')
+fig = plt.figure(figsize=(8, 3))
 series_to_hist = teams_trip.dropna(subset=['stop_time']).stop_time / 3600
-#series_to_hist2 = teams_trip.dropna(subset=['stop_time']).loc[(teams_trip.stop_time > 90 * 60)].stop_time / 3600
-series_to_hist.name = 'Время стоянки локомотива для смены бригады (час)'
 title = 'Распределение времен стоянок локомотивов для смены бригад\n(среднее %.2f ч., медиана %.2f ч.)' %        (series_to_hist.mean(), series_to_hist.median())
-ax = sns.distplot(series_to_hist, hist_kws={'label':'a'}, color='b', hist=False, kde_kws={'shade':True})
-ax.set_title(title)
-sns.despine()
+sns.kdeplot(series_to_hist, shade=True)
+plt.title(title)
+plt.xlabel('Время стоянки для смены бригад (час)')
 filename = 'loco_stop_time.png'
 fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
 add_image(filename)
@@ -661,13 +637,13 @@ add_image(filename)
 
 # #### Поиск локомотивов, у которых смены бригады занимает меньше 15 минут
 
-# In[39]:
+# In[156]:
 
 #add_line('Время начала планирования' % time.ctime(current_time))
 cols2 = ['loco', 'st_from_name', 'st_to_name', 'time_end_f', 'tsn_norm', 'train', 'stop_time', 'team']
 pd.set_option('display.max_colwidth', 20)
 teams_trip = teams_trip.dropna(subset=['time_start_next'])
-teams_trip['tsn_norm'] = teams_trip.time_start_next.apply(lambda x: time.strftime(time_format, time.localtime(x)))
+teams_trip['tsn_norm'] = teams_trip.time_start_next.apply(nice_time)
 teams_trip.loc[teams_trip.stop_time.isnull() == False, 'next_team'] = teams_trip.team.shift(-1)
 teams_trip['train_type'] = teams_trip.train.apply(lambda x: 'Резерв' if str(x)[0]=='8'                                                       else ('Задания' if str(x)[0]=='9' else 'Реальный'))
 fast_change = teams_trip.loc[teams_trip.stop_time < 15 * 60]
@@ -694,14 +670,14 @@ loco_cols = ['loco', 'st_from','st_to', 'st_from_name', 'st_to_name', 'time_star
 # <a id='rest_time'></a>
 # ## Проверка времен отдыха бригад [ToC](#toc)
 
-# In[40]:
+# In[157]:
 
 add_header('Проверка времен отдыха бригад', h=2, p=False)
 
 
-# In[41]:
+# In[158]:
 
-add_line('Время начала планирования: %s' % time.strftime(time_format, time.localtime(current_time)))
+add_line('Время начала планирования: %s' % nice_time(current_time))
 team_cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'time', 'state', 'loco']
 team_plan['time'] = np.round(((team_plan.time_end - team_plan.time_start) / 3600), 2)
 rest_outliers = team_plan[(team_plan.state == 4) & (team_plan.time > 1000)]
@@ -722,7 +698,7 @@ else:
 
 # #### Отсев бригад со слишком ранним временем явки
 
-# In[42]:
+# In[159]:
 
 rest_old_presence = rest_check[(rest_check.info_presence < current_time - 12 * 3600) & (rest_check.state_info != '3')]
 add_header('Всего %d бригад со слишком большим отдыхом и слишком ранним временем явки (сутки назад и более). Примеры:' 
@@ -732,23 +708,21 @@ add_line(rest_old_presence.sort_values('time', ascending=False)[out_cols].head(1
 
 # #### Бригады со слишком большим отдыхом
 
-# In[43]:
+# In[160]:
 
 long_rest = rest_check[(rest_check.time > 10) & (rest_check.team.isin(rest_old_presence.team) == False)]
 add_header('Всего %d бригад с большим временем отдыха (больше 10 часов) (показаны первые 10):' % len(long_rest.index))
 add_line(long_rest.sort_values('time', ascending=False)[out_cols].head(10))
 
 
-# In[44]:
+# In[161]:
 
 rest_show = rest_check[(rest_check.team.isin(rest_old_presence.team) == False)]
+fig = plt.figure(figsize=(8, 3))
 title = 'Распределение бригад по временам на отдых\n(медианное время отдыха = %.2f час)' % (rest_show.time.median())
-sns.set_style('whitegrid')
-sns.set_context('notebook')
-fig = plt.figure()
-ax = sns.distplot(rest_show.time, hist=False, kde_kws={'shade':True}, color='b')
-ax.set(title=title)
-sns.despine()
+sns.kdeplot(rest_show.time, shade=True)
+plt.title(title)
+plt.xlabel('Время отдыха (час)')
 filename = 'team_rest_time.png'
 fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
 add_image(filename)
@@ -756,24 +730,24 @@ add_image(filename)
 
 # #### Бригады с недостаточным отдыхом
 
-# In[45]:
+# In[162]:
 
 rest = team_plan[team_plan.state == 4][['team', 'time_start', 'time']]
 team_trips['rest_start_time'] = team_trips.team.map(rest.set_index('team').time_start)
-team_trips['rest_start_time_f'] = team_trips.rest_start_time                .apply(lambda x: time.strftime(time_format, time.localtime(x)) if np.isnan(x) == False else '')
+team_trips['rest_start_time_f'] = team_trips.rest_start_time.apply(nice_time)
 team_trips['rest_time'] = team_trips.team.map(rest.set_index('team').time)
 team_trips['min_rest_time'] = np.round((team_trips.rest_start_time - team_trips.curr_presence) / (2 * 3600), 2)
 team_trips['underrest'] = team_trips.min_rest_time - team_trips.rest_time
 
 
-# In[46]:
+# In[163]:
 
 # Для подсчета требуемого отдыха удаляем поездки, которые связаны с одной явкой бригады; 
 # для каждой явки оставляем только последнюю поездку, чтобы правильно взять полное рабочее время.
 team_trips_cut = team_trips.sort_values(['team', 'curr_presence', 'work_time'], ascending=[True, True, False])                            .drop_duplicates(subset=['team', 'curr_presence'])
 
 
-# In[47]:
+# In[164]:
 
 cols = ['team', 'curr_presence_norm', 'time_start_f', 'rest_start_time_f', 
         'work_time', 'min_rest_time', 'rest_time', 'underrest']
@@ -784,7 +758,7 @@ add_header('Распределение по типу бригад:')
 add_line(underrest.team_type.value_counts())
 
 
-# In[48]:
+# In[165]:
 
 underrest_no_overtime = underrest[underrest.work_time <= WORK_TIME_LIMIT]
 underrest_no_n = underrest_no_overtime.team.drop_duplicates().count()
@@ -792,21 +766,19 @@ add_header('Всего %d бригад без переработки с недо
 add_header('\nРаспределение по типу бригад:')
 add_line(underrest_no_overtime.team_type.value_counts())
 add_header('\nПримеры бригад без переработки с недостаточным отдыхом:')
-add_line(underrest_no_overtime.sort_values('underrest', ascending=False).head(10 if underrest_no_n > 20 else underrest_no_n)[cols])
+add_line(underrest_no_overtime.sort_values('underrest', ascending=False)         .head(10 if underrest_no_n > 20 else underrest_no_n)[cols])
 
-sns.set_context('notebook')
-sns.set_style('whitegrid')
+sns.set(style='whitegrid', context='notebook')
 title = 'Распределение недостаточного отдыха бригад\n(медианное время недоотдыха = %.2f час)'             % (underrest_no_overtime.underrest.median())
-fig = plt.figure()
+fig = plt.figure(figsize=(8, 4))
 ax = sns.distplot(underrest_no_overtime.underrest, color='b', hist=False, kde_kws={'shade':True})
 ax.set(title=title, xlabel='Недостаточный отдых, ч.')
-sns.despine()
 filename = 'team_under_rest.png'
 fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
 add_image(filename)
 
 
-# In[49]:
+# In[166]:
 
 team_plan['loco_time'] = list(zip(team_plan.loco, team_plan.time_start))
 loco_plan['loco_time'] = list(zip(loco_plan.loco, loco_plan.time_start))
@@ -819,12 +791,12 @@ time.ctime(1463065200)
 
 # ## Проверка подвязки бригад по Иркутску
 
-# In[50]:
+# In[167]:
 
 add_header('Анализ бригад, проезжающих через Иркутск', h=2, p=False)
 
 
-# In[51]:
+# In[168]:
 
 team_cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'state', 'loco', 'depot_name']
 team_plan['depot_name'] = team_plan.depot.map(st_names.name)
@@ -847,7 +819,7 @@ add_line(b.reset_index())
 # <a id='ready_time'></a>
 # ## Проверка времени явки бригад [ToC](#toc)
 
-# In[52]:
+# In[169]:
 
 add_header('Проверка корректости времен явки бригад в депо приписки во входных данных', h=2, p=False)
 
@@ -860,12 +832,12 @@ add_header('Проверка корректости времен явки бри
 # - если у бригад указано depot_time < rest_start_time, то эта разница не должна быть очень большой. 
 # - если у бригад указано depot_time < return_time, то эта разница тоже не должна быть очень большой.
 
-# In[53]:
+# In[170]:
 
-add_line('Время начала планирования: %s' % (time.strftime(time_format, time.localtime(current_time))))
-team_info['dt_norm'] = team_info.depot_time.apply(lambda x: time.strftime(time_format, time.localtime(x)) if x > 0 else x)
-team_info['rt_norm'] = team_info.return_time.apply(lambda x: time.strftime(time_format, time.localtime(x)) if x > 0 else x)
-team_info['rst_norm'] = team_info.rest_time.apply(lambda x: time.strftime(time_format, time.localtime(x)) if x > 0 else x)
+add_line('Время начала планирования: %s' % (nice_time(current_time)))
+team_info['dt_norm'] = team_info.depot_time.apply(nice_time)
+team_info['rt_norm'] = team_info.return_time.apply(nice_time)
+team_info['rst_norm'] = team_info.rest_time.apply(nice_time)
 team_info['rest_dep_delta'] = np.round(((team_info.rest_time - team_info.depot_time) / 3600), 2)
 team_info['return_dep_delta'] = np.round(((team_info.return_time - team_info.depot_time) / 3600), 2)
 
@@ -885,19 +857,19 @@ add_line(dep_less_return[dep_less_return.return_dep_delta > 12][info_cols].sort_
 # <a id='change'></a>
 # ## Проверка смены бригад на корректных станциях [ToC](#toc)
 
-# In[54]:
+# In[171]:
 
 add_header('Проверка смены бригад на корректных станциях', h=2, p=False)
 
 
 # ### Проверка случаев проезда бригад мимо станций обязательной смены
 
-# In[55]:
+# In[172]:
 
 add_header('Проверка проезда бригад мимо станций обязательной смены', h=3, p=False)
 
 
-# In[56]:
+# In[173]:
 
 st_team_change_full = ['КРАСНОЯРСК-ВОСТОЧНЫЙ', 'ЗИМА', 'ХИЛОК', 'МОГОЧА', 'ОБЛУЧЬЕ', 'РУЖИНО', 'СМОЛЯНИНОВО', 
                       'САЯНСКАЯ', 'ЛЕНА', 'СЕВЕРОБАЙКАЛЬСК', 'НОВЫЙ УОЯН', 
@@ -914,13 +886,13 @@ add_header('\nРаспределение по станциям (первые 5 �
 add_line(no_stop.st_to_name.value_counts().head())
 
 
-# In[57]:
+# In[174]:
 
 add_header('\nПримеры ошибочных бригад (первые 10):')
 add_line(no_stop.drop_duplicates('st_to_name').sort_values('time_end')[cols])
 
 
-# In[58]:
+# In[175]:
 
 add_header('Полные планы по некоторым ошибочным бригадам:')
 top_st = no_stop.st_to_name.value_counts().index[0]
@@ -941,22 +913,19 @@ add_line(team_plan[team_plan.team == no_stop[no_stop.st_to_name == sec_st].iloc[
 
 # ### Проверка случаев смены бригад не на допустимых станциях
 
-# In[59]:
+# In[176]:
 
 add_header('Проверка случаев смены бригад не на допустимых станциях', h=3, p=False)
 
 
-# In[60]:
+# In[177]:
 
 add_line('Исключаются случаи смены бригады из-за завершения маршрута локомотива или поезда' + 
          ', а также случаи смены бригады на станции, которая является депо приписки бригады')
 
 
-# In[61]:
+# In[178]:
 
-#loco_plan['loco_end'] = loco_plan.loco != loco_plan.loco.shift(-1)
-#train_ends = train_plan.drop_duplicates('train', keep='last')[['train', 'st_to_name']].set_index('train')
-#loco_plan['train_end'] = loco_plan.train.map(train_ends.st_to_name) == loco_plan.st_to_name
 loco_plan['end_trip'] = (loco_plan.state != loco_plan.state.shift(-1)) | (loco_plan.train != loco_plan.train.shift(-1))                        | (loco_plan.loco != loco_plan.loco.shift(-1))
 team_plan['start_station_name'] = team_plan.team.map(team_plan[team_plan.state.isin([0, 1])]                                                     .drop_duplicates('team').set_index('team').st_from_name)
 team_plan.depot_name.fillna(team_plan.start_station_name, inplace=True)
@@ -966,11 +935,9 @@ loco_plan['team_depot_name'] = loco_plan.team.map(team_plan.drop_duplicates('tea
 loco_plan['team_ready_depot_name'] = loco_plan.team.map(team_plan.drop_duplicates('team').set_index('team').depot_st_name)
 
 
-# In[62]:
+# In[179]:
 
 pr_st = pd.read_csv(FOLDER + 'mandatory/priority_team_change_stations.csv', sep=';', encoding='utf-8-sig', dtype={'station':str}).station
-#team_change = loco_plan[(loco_plan.state != 4) 
-#                        & (loco_plan.team_end == True) & (loco_plan.loco_end == False) & (loco_plan.train_end == False)]
 team_change = loco_plan[(loco_plan.state != 4) & (loco_plan.team_end == True) & (loco_plan.end_trip == False)]
 bad_team_change = team_change[(team_change.st_to.isin(pr_st) == False) 
                               & (team_change.st_to_name != team_change.team_depot_name)
@@ -985,7 +952,7 @@ else:
     
 
 
-# In[63]:
+# In[180]:
 
 with (pd.option_context('display.max_colwidth', 20)):
     if not bad_team_change.st_to_name.dropna().empty:
@@ -1000,12 +967,12 @@ with (pd.option_context('display.max_colwidth', 20)):
 # <a id='presence'></a>
 # ## Проверка отправления бригады не ранее времени явки [ToC](#toc)
 
-# In[64]:
+# In[181]:
 
 add_header('Проверка отправления бригады не ранее времени явки', h=2, p=False)
 
 
-# In[65]:
+# In[182]:
 
 # Вычисляем максимальное время явки, добавляем его в team_info и team_plan
 # В таблице presence_fail --- ошибочные отправления бригад до времени явки
@@ -1016,16 +983,16 @@ team_cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'ready_type',
 
 team_info['all_presence'] = list(zip(team_info.depot_time, team_info.return_time))
 team_info['presence'] = team_info.all_presence.apply(lambda x: x[0] if x[0] > x[1] else x[1])
-team_info['presence_norm'] = team_info.presence.apply(lambda x: time.strftime(time_format, time.localtime(x)) if x>0 else x)
+team_info['presence_norm'] = team_info.presence.apply(nice_time)
 team_plan['presence'] = team_plan.team.map(team_info.set_index('team').presence)
-team_plan['presence_norm'] = team_plan.presence.apply(lambda x: time.strftime(time_format, time.localtime(x)) if x>0 else x)
+team_plan['presence_norm'] = team_plan.presence.apply(nice_time)
 team_plan['presence_gap'] = team_plan.time_start - team_plan.presence
 team_plan['ready_type'] = team_plan.team.map(team_info.set_index('team').ready_type)
 presence_fail = team_plan[(team_plan.state.isin([0, 1])) & (team_plan.presence_gap < presence_lim)].drop_duplicates('team')
 pr = team_info[['team', 'depot_time', 'return_time', 'presence', 'presence_norm']]
 
 
-# In[66]:
+# In[183]:
 
 p = presence_fail[presence_fail.state == 0]
 ph = presence_fail[(presence_fail.state == 0) & (presence_fail.time_start >= current_time)]
@@ -1043,7 +1010,7 @@ else:
     add_header('\nНет бригад, которые запланированы к отправлению пассажирами ранее времени явки после начала планирования')
 
 
-# In[67]:
+# In[184]:
 
 f = presence_fail[presence_fail.state == 1]
 fh = presence_fail[(presence_fail.state == 1) & (presence_fail.time_start >= current_time)]
@@ -1064,17 +1031,17 @@ else:
 # <a id='before_current_time'></a>
 # ## Проверка планирования бригад до времени начала планирования [ToC](#toc)
 
-# In[68]:
+# In[185]:
 
 add_header('Проверка планирования бригад до времени начала планирования', h=2, p=False)
 
 
-# In[69]:
+# In[186]:
 
 team_cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'state', 'loco', 'state_info']
 
 add_line('(Не учитываются бригады, которые на начало планирования находились на перегоне)')
-add_line('Время начала планирования: %s' % time.strftime(time_format, time.localtime(current_time)))
+add_line('Время начала планирования: %s' % nice_time(current_time))
 
 total_teams = team_plan.team.drop_duplicates().count()
 
@@ -1097,30 +1064,29 @@ if not tbef.empty:
 # <a id='presenting'></a>
 # ## Проверка планируемых явок бригад [ToC](#toc)
 
-# In[70]:
+# In[187]:
 
 add_header('Проверка планируемых явок бригад', h=2, p=False)
 
 
-# In[71]:
+# In[188]:
 
 team_cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'tt', 'state', 'loco', 'state_info']
 team_plan['tt'] = team_plan.time_end - team_plan.time_start
 min_presenting = team_plan[team_plan.state == 2][team_cols].tt.min()
 max_presenting = team_plan[team_plan.state == 2][team_cols].tt.max()
 add_header('Разброс времен на явку бригад: от %.2f ч. до %.2f ч.' % (min_presenting / 3600, max_presenting / 3600))
-sns.set_style('whitegrid')
-sns.set_context('notebook')
-fig = plt.figure()
+
+sns.set(style='whitegrid', context='notebook')
+fig = plt.figure(figsize=(8, 3))
 ax = sns.distplot(team_plan[team_plan.state == 2][team_cols].tt / 3600, hist=False, bins=20, color='b', kde_kws={'shade':True})
 ax.set(xlabel='Время на явку, ч.', title='Распределение времен на явку бригад')
-sns.despine()
 filename = 'team_presenting.png'
 fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
 add_image(filename)
 
 
-# In[72]:
+# In[189]:
 
 team_plan['next_state'] = team_plan.state.shift(-1)
 team_plan['next_time_start_f'] = team_plan.time_start_f.shift(-1)
@@ -1138,7 +1104,7 @@ add_line(rest_pres.st_from_name.value_counts().head())
 # <a id='check_useful_assign'></a>
 # ## Проверка использования бригад [ToC](#toc)
 
-# In[73]:
+# In[190]:
 
 add_header('Проверка использования бригад', h=2, p=False)
 
@@ -1146,31 +1112,19 @@ add_header('Проверка использования бригад', h=2, p=Fa
 # <a id='only_pass'></a>
 # ### Бригады, запланированные к отправлению пассажирами без последующей подвязки [ToC](#toc)
 
-# In[74]:
+# In[191]:
 
 add_header('Проверка использования бригад после засылки пассажирами', h=3, p=False)
 
 
-# In[75]:
+# In[192]:
 
 team_plan['all_states'] = team_plan.team.map(team_plan.groupby('team').state.unique())
-#team_plan['last_state'] = team_plan.team.map(team_plan
-#                                             .sort_values(['team', 'time_start'], ascending=[True, False])
-#                                             .drop_duplicates('team')[['team', 'state']]
-#                                             .set_index('team')
-#                                             .state)
-
-#team_plan['first_state'] = team_plan.team.map(team_plan
-#                                             .sort_values(['team', 'time_start'])
-#                                             .drop_duplicates('team')[['team', 'state']]
-#                                             .set_index('team')
-#                                             .state)
-
 cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'depot_name',
         'state', 'all_states']
 
 
-# In[76]:
+# In[193]:
 
 def get_cat(all_states):
     if 1 in all_states:
@@ -1192,13 +1146,13 @@ add_header('Всего %d бригад, для которых планирует
       % only_pass_teams.team.drop_duplicates().count())
 
 
-# In[77]:
+# In[194]:
 
 add_header('Станции, с которых чаще всегда планируется лишняя отправка пассажирами:')
 add_line(only_pass_teams.drop_duplicates('team').st_from_name.value_counts().head(10))
 
 
-# In[78]:
+# In[195]:
 
 with pd.option_context('display.max_colwidth', 25):
     if only_pass_teams.team.drop_duplicates().count() != 0:
@@ -1208,7 +1162,7 @@ with pd.option_context('display.max_colwidth', 25):
             add_line('')
 
 
-# In[79]:
+# In[196]:
 
 irk = only_pass_teams[only_pass_teams.st_from_name == 'ИРКУТСК-СОРТИРОВОЧНЫЙ']
 if not irk.empty:
@@ -1219,12 +1173,12 @@ if not irk.empty:
 # <a id='only_presence'></a>
 # ### Бригады, планируемые только на явку [ToC](#toc)
 
-# In[80]:
+# In[197]:
 
 add_header('Бригады, планируемые только на явку', h=3, p=False)
 
 
-# In[81]:
+# In[198]:
 
 cols = ['team', 'st_from_name', 'time_start_f', 'time_end_f', 'depot_name', 'state_info', 'all_states']
 only_pr = team_plan[team_plan.cat == 'only_presence']
@@ -1245,7 +1199,7 @@ else:
 
 # ## Проверка наличия явки в планах у всех запланированных бригад
 
-# In[82]:
+# In[199]:
 
 team_plan['all_states'] = team_plan.team.map(team_plan.groupby('team').state.unique())
 no_pres = team_plan[team_plan.all_states.apply(lambda x: (2 not in x) & (1 in x))]
@@ -1259,27 +1213,15 @@ add_header('Распределение по типу бригад (в долях
 add_line(no_pres.drop_duplicates('team').team_type.value_counts(normalize=True))
 
 
-# In[83]:
-
-# print(nice_time(current_time))
-# cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state']
-# for hor in [1, 3, 6, 12]:
-#     a = team_plan[(team_plan.state == 2) & (team_plan.team_type == 'Реальная')
-#           & (team_plan.time_start > current_time) & (team_plan.time_start < current_time + hor * 3600)]\
-#         .set_index('team').sample(20)
-#     for t in a.index:
-#         print('+prev_team(id(%s),prev_plan([ready_time(%s)]))' % (t, a.ix[t].time_start))
-
-
 # <a id='pass_teams_in_plan'></a>
 # ## Проверка подвязки негрузовых бригад [ToC](#toc)
 
-# In[84]:
+# In[200]:
 
 add_header('Проверка подвязки негрузовых бригад', h=2, p=False)
 
 
-# In[85]:
+# In[201]:
 
 cols = ['team', 'ttype', 'loco_info', 'st_from_name', 'st_to_name', 'time_start_f', 'state', 'loco']
 bad_pass_teams = team_plan[(team_plan.ttype == 0) & (team_plan.loco != team_plan.loco_info) 
@@ -1292,9 +1234,376 @@ else:
     add_line(bad_pass_teams.drop_duplicates('team')[cols].head())
 
 
+# [ToC](#toc)
+# ## Проверка сохранения предыдущих времен явок
+# 
+# В планировщик в сообщениях `prev_team` передаются времена явок бригад, запланированные на предыдущем расчете. В зависимости от горизонта, на котором запланированы эти явки, их при новом расчете можно сдвигать лишь на очень ограниченное время.
+
+# In[202]:
+
+add_header('Проверка сохранения предыдущих времен явок', h=2, p=False)
+
+
+# In[203]:
+
+add_line('Время начала планирования: %s' % nice_time(current_time))
+prev_team = pd.read_csv(FOLDER + 'prev_team.csv', dtype={'team':str})
+prev_team['dt_time'] = prev_team.prev_ready_time.apply(nice_time)
+prev_team['team_type'] = prev_team.team.apply(lambda x: int(str(x)[0]))
+prev_team['plan_hor'] = (prev_team.prev_ready_time - current_time) / 3600
+team_plan['prev_ready_time'] = team_plan.team.map(prev_team.drop_duplicates('team').set_index('team').prev_ready_time)
+team_plan['prev_ready_time_f'] = team_plan.prev_ready_time.apply(nice_time)
+
+prev_team_no_planned = prev_team[(prev_team.team_type != 7) & (prev_team.team.isin(team_info.team))
+                                 & (prev_team.team.isin(team_plan[team_plan.state.isin([0, 1])].team) == False)]
+prev_team_no_planned_6 = prev_team_no_planned[(prev_team_no_planned.plan_hor > 0) 
+                                              & (prev_team_no_planned.plan_hor < 6)]
+prev_team_n = prev_team[(prev_team.team_type != 7) & (prev_team.team.isin(team_info.team))].team.count()
+if prev_team_no_planned.empty:
+    add_header('Все бригады с предыдущими явками запланированы')
+else:
+    add_header('Не запланировано %d бригад (%.2f%%) с предыдущими явками (%d на горизонте до 6 часов). Примеры:'
+              % (prev_team_no_planned.team.count(),                  
+                 100 * prev_team_no_planned.team.count() / prev_team_n,
+                 prev_team_no_planned_6.team.count()))
+    add_line(prev_team_no_planned[(prev_team_no_planned.plan_hor > 0) 
+                                  & (prev_team_no_planned.plan_hor < 6)].sort_values('plan_hor').head(10))    
+
+cols = ['team', 'st_from_name', 'time_start_f', 'time_end_f', 'state', 'prev_ready_time_f']
+tp_first = team_plan[team_plan.team.isin(team_info[team_info.state == '3'].team)].drop_duplicates('team').copy()
+#tp_first = team_plan.drop_duplicates('team').copy()
+
+
+# In[204]:
+
+def get_prev_ready_lag(prev_ready_time, current_time):
+    if np.isnan(prev_ready_time): prev_ready_time = 0        
+    d = prev_ready_time - current_time
+    if d < 1 * 3600:
+        lag = 0
+    elif d < 3 * 3600:
+        lag = 0.25 * 3600
+    elif d < 6 * 3600:
+        lag = 0.5 * 3600
+    else:
+        lag = 1 * 3600
+    return lag
+
+tp_first['good_lag'] = tp_first.apply(lambda x: get_prev_ready_lag(x.prev_ready_time, current_time), axis=1)
+cols = ['team', 'st_from_name', 'time_start_f', 'state', 'prev_ready_time_f', 'good_lag', 'real_lag', 'state_info']
+tp_first['real_lag'] = tp_first.time_start - tp_first.prev_ready_time
+good_prev = tp_first[(tp_first.team.isin(prev_team.team)) & (tp_first.state == 2)
+                     & (tp_first.good_lag >= np.abs(tp_first.real_lag))]
+
+bad_prev = tp_first[(tp_first.team.isin(prev_team.team)) & (tp_first.state == 2)
+                     & (tp_first.good_lag < np.abs(tp_first.real_lag))]
+if bad_prev.empty:
+    add_header('Все запланированные бригады с предыдущими явками запланированы на явку без неприемлемых задержек')
+else:
+    add_header('Всего %d бригад с предыдущими явками (%.2f%% от запланированных) с существенными отклонениями времен явок:'
+              % (bad_prev.team.count(), 
+                 100 * bad_prev.team.count() / (prev_team.team.count() - prev_team_no_planned.team.count())))
+    add_line(bad_prev[cols].head(10))
+
+
+# In[205]:
+
+print(nice_time(current_time))
+team_info['depot_name'] = team_info.depot.map(st_names.name)
+team_info['prev_ready_time'] = team_info.team.map(prev_team.drop_duplicates('team').set_index('team').prev_ready_time)
+team_info['prev_ready_time_f'] = team_info.prev_ready_time.apply(nice_time)
+team_info['oper_time_f'] = team_info.oper_time.apply(nice_time)
+team_info['plan_start_time'] = team_info.team.map(team_plan[team_plan.state.isin([0, 1])]                                                  .drop_duplicates('team').set_index('team').time_start)
+team_info['plan_start_time_f'] = team_info['plan_start_time'].apply(nice_time)
+cols = ['team', 'number', 'oper_time_f', 'depot_time_f', 'state', 'prev_ready_time_f', 'plan_start_time_f']
+team_info[(team_info.uth == 1) & (team_info.state == '3')
+          & (team_info.depot_name == 'ИРКУТСК-СОРТИРОВОЧНЫЙ')].sort_values('oper_time')[cols]
+
+
+# [ToC](#toc)
+# ## Проверка возврата правильных времен явок у бригад
+# 
+# Чтобы на форме текущего планирования можно было рассчитать рабочее время бригады, из планировщика в плане должны быть возвращены времена явок всех бригад:
+# * Для бригад, у которых начальное состояние было отличное от 3 или 4, возвращенное время явки должно копировать время явки, переданное во входных данных.
+# * Для бригад в начальном состоянии 3 или 4 и фейковых бригад время явки должно вычисляться на основе запланированного времени отправления.
+
+# In[206]:
+
+add_header('Проверка возврата правильных времен явок у бригад', h=2, p=False)
+
+
+# In[207]:
+
+real_pres = team_info[team_info.state.isin(['1', '2', '5'])][['team', 'presence', 'presence_norm']]
+a = team_plan[(team_plan.state == 2) & (team_plan.team.isin(real_pres.team))].drop_duplicates('team')
+real_pres_fail = a[a.time_start != a.presence][['team', 'time_start', 'time_start_f', 'state_info', 'presence', 'presence_norm']]
+if real_pres_fail.empty:
+    add_header('Для всех бригад в состояниях 1, 2, 5 явки запланированы верно')
+else:
+    add_header('Всего %d бригад в состояниях 1, 2, 5, для которых возвращена неверная первая явка. Примеры:' 
+               % real_pres_fail.team.count())
+    add_line(real_pres_fail.head(10))
+    add_line('\nРаспределение по состояниям:')
+    add_line(real_pres_fail.state_info.value_counts())
+    team_id = real_pres_fail.iloc[0].team
+    cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state', 'loco']
+    add_line(team_plan[team_plan.team == team_id][cols])
+    real_pres_fail['ready_delta'] = real_pres_fail.time_start - real_pres_fail.presence
+    fig = plt.figure(figsize=(8, 3))    
+    #fig = plt.figure()
+    sns.set(style='whitegrid', context='notebook')
+    sns.kdeplot(real_pres_fail.ready_delta / 3600)
+    plt.xlabel('Запаздывание времени явки, ч. (среднее = %.2f ч.)' % np.mean(real_pres_fail.ready_delta / 3600))
+    filename = 'team125_ready_late.png'
+    fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
+    add_image(filename)
+
+
+# Для бригад в начальных состояниях 6 (прибыла на станцию с локомотивом), 7 (прибыла на станцию пассажиром), 9 (сдача локомотива) проверяем, запланирован ли далее для бригады отдых. Если отдых запланирован, то не сравниваем время явки с исходным - оно будет задано вновь после отдыха. Если отдых не запланирован, то явка должна быть возвращена.
+
+# In[208]:
+
+real_pres = team_info[team_info.state.isin(['6', '7', '9'])]
+tp = team_plan[(team_plan.team.isin(real_pres.team)) & (team_plan.all_states.apply(lambda x: 4 not in x))]
+tp_no_ready = tp[tp.all_states.apply(lambda x: 2 not in x)]
+if tp_no_ready.empty:
+    add_header('Для всех бригад в состояниях 6, 7, 9 запланированы требуемые явки')
+else:
+    add_header('Для %d бригад в исходных состояниях 6, 7, 9 не запланированы явки. Примеры:' 
+               % tp_no_ready.drop_duplicates('team').team.count())
+    add_line(tp_no_ready.drop_duplicates('team')[['team', 'loc_name', 'state_info', 'all_states']].head())    
+    add_line('\nРаспределение по состояниям:')
+    add_line(tp_no_ready.drop_duplicates('team').state_info.value_counts())
+    cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state', 'loco']
+    team_id = tp_no_ready.iloc[0].team
+    add_line(team_plan[team_plan.team == team_id][cols])
+    
+tp_ready_time_fail = tp[(tp.state == 2) & (tp.time_start != tp.presence)].drop_duplicates('team')
+if tp_ready_time_fail.empty:
+    add_header('Для всех бригад в состояниях 6, 7, 9 явки запланированы верно')
+else:
+    add_header('\nВсего %d бригад в состояниях 6, 7, 9, для которых возвращена неверная первая явка. Примеры:' 
+               % tp_ready_time_fail.team.count())
+    cols = ['team', 'time_start', 'time_start_f', 'state_info', 'presence', 'presence_norm']
+    add_line(tp_ready_time_fail[cols].head())
+    add_line('\nРаспределение по состояниям:')
+    add_line(tp_ready_time_fail.state_info.value_counts())
+    cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state', 'loco']
+    team_id = tp_ready_time_fail.iloc[0].team
+    add_line(team_plan[team_plan.team == team_id][cols])
+    fig = plt.figure(figsize=(8, 3))            
+    sns.kdeplot(real_pres_fail.ready_delta / 3600)
+    plt.xlabel('Запаздывание времени явки, ч. (среднее = %.2f ч.)' % np.mean(real_pres_fail.ready_delta / 3600))
+    filename = 'team679_ready_late.png'
+    fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
+    add_image(filename)
+
+
+# In[209]:
+
+tp = team_plan[(team_plan.state_info.isin(['3', '4'])) & (team_plan.all_states.apply(lambda x: (x[0] != 0) & (1 in x)))]
+tp_no_ready = tp[tp.all_states.apply(lambda x: 2 not in x)]
+if tp_no_ready.empty:
+    add_header('Для всех бригад в состояниях 3, 4 запланированы требуемые явки')
+else:
+    add_header('Для %d бригад в исходных состояниях 3, 4 не запланированы явки. Примеры:' 
+               % tp_no_ready.drop_duplicates('team').team.count())
+    add_line(tp_no_ready.drop_duplicates('team')[['team', 'loc_name', 'state_info', 'all_states']].head())    
+    add_line('\nРаспределение по состояниям:')
+    add_line(tp_no_ready.drop_duplicates('team').state_info.value_counts())
+    cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state', 'loco']
+    team_id = tp_no_ready.iloc[0].team
+    add_line(team_plan[team_plan.team == team_id][cols])
+
+
+# In[210]:
+
+tp = team_plan[(team_plan.team_type == 'Фейковая') & (team_plan.all_states.apply(lambda x: (x[0] != 0) & (1 in x)))]
+tp_no_ready = tp[tp.all_states.apply(lambda x: 2 not in x)]
+if tp_no_ready.empty:
+    add_header('Для всех фейковых бригад запланированы требуемые явки')
+else:
+    add_header('Для %d фейковых бригад не запланированы явки. Примеры:' 
+               % tp_no_ready.drop_duplicates('team').team.count())
+    add_line(tp_no_ready.drop_duplicates('team')[['team', 'loc_name', 'state_info', 'all_states']].head())        
+    cols = ['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 'state', 'loco']
+    team_id = tp_no_ready.iloc[0].team
+    add_line(team_plan[team_plan.team == team_id][cols])
+
+
+# [ToC](#toc)
+# ## Проверка планирования УТХ бригад
+# 
+# Если для какого-то депо приписки переданы бригады с признаком `uth(1)`, то такие бригады должны планироваться в первую очередь, и только после них должны планироваться бригады с признаком `uth(0)`. Для бригад с признаком `uth(0)` должен производиться сдвиг явки на время после максимального времени явки бригад с `uth(1)` для данного депо. Если бригад с `uth(1)` для данного депо не передано, то сдвиг производить не требуется.
+
+# In[211]:
+
+add_header('Проверка планирования УТХ-бригад', h=2, p=False)
+
+
+# ### УТХ-бригады должны планироваться раньше не-УТХ бригад, начальное состояние которых = 3
+
+# In[212]:
+
+print(nice_time(current_time))
+uth_depots = team_info[team_info.uth == 1].depot.unique()
+cols = ['team', 'depot_name', 'uth', 'time_start_f', 'state']
+
+t_ready_max = team_info[(team_info.uth == 1)].groupby('depot').presence.max()
+t_plan_max = team_plan[(team_plan.uth == 1) 
+                       & (team_plan.state.isin([0, 1]))].drop_duplicates('team').groupby('depot').time_start.max()
+team_plan['uth_plan_max_time'] = team_plan.depot.map(t_plan_max)
+team_plan['uth_plan_max_time_f'] = team_plan.uth_plan_max_time.apply(nice_time)
+team_plan['uth_ready_max_time'] = team_plan.depot.map(t_ready_max)
+team_plan['uth_ready_max_time_f'] = team_plan.uth_ready_max_time.apply(nice_time)
+cols = ['team', 'depot_name', 'st_from_name', 'st_to_name', 'time_start_f', 'state', 
+        'uth_plan_max_time_f', 'uth_ready_max_time_f']
+t_uth_soft_fail = team_plan[(team_plan.uth == 0) & (team_plan.state_info == '3') & (team_plan.depot.isin(uth_depots))
+                      & (team_plan.state.isin([0, 1])) & (team_plan.time_start < team_plan.uth_plan_max_time)
+                      & (team_plan.depot_name == team_plan.loc_name)].drop_duplicates('team')
+t_uth_hard_fail = team_plan[(team_plan.uth == 0) & (team_plan.state_info == '3') & (team_plan.depot.isin(uth_depots))
+                      & (team_plan.state.isin([0, 1])) & (team_plan.time_start < team_plan.uth_ready_max_time)
+                      & (team_plan.depot_name == team_plan.loc_name)].drop_duplicates('team')
+
+total_uth_depots = team_plan[(team_plan.uth == 0) & (team_plan.state_info == '3') 
+                             & (team_plan.depot.isin(uth_depots))].team.drop_duplicates().count()
+
+t_uth_fail_diff_depot_n = t_uth_soft_fail[t_uth_soft_fail.depot_name != t_uth_soft_fail.st_from_name].team.count()
+
+if t_uth_soft_fail.empty:
+    add_header('Нет случаев, когда не-УТХ-бригада планируется раньше УТХ-бригады')
+else:
+    add_header('Всего %d не-УТХ-бригад (%.2f%%), которые отправлены ранее самой поздней УТХ-бригады' 
+               % (t_uth_soft_fail.team.count(), 100 * t_uth_soft_fail.team.count() / total_uth_depots))
+    add_header('-- из них %d бригад, у которых место явки не совпадает с депо приписки' % t_uth_fail_diff_depot_n)
+    add_line('\nРаспределение по депо (первые 5):')
+    add_line(t_uth_soft_fail.depot_name.value_counts().head(10))
+    add_line('\nПримеры бригад (первые 10 по времени отправления):')
+    add_line(t_uth_soft_fail[t_uth_soft_fail.depot_name == t_uth_soft_fail.st_from_name].head(10)[cols])    
+
+
+# In[213]:
+
+if t_uth_hard_fail.empty:
+    add_header('Нет случаев, когда не-УТХ-бригада планируется раньше явки УТХ-бригады')
+else:
+    add_header('Всего %d не-УТХ-бригад (%.2f%%), которые отправлены ранее самой поздней явки УТХ-бригады' 
+               % (t_uth_hard_fail.team.count(), 100 * t_uth_hard_fail.team.count() / total_uth_depots))
+    add_header('-- из них %d бригад, у которых место явки не совпадает с депо приписки' % t_uth_fail_diff_depot_n)
+    add_line('\nРаспределение по депо (первые 5):')
+    add_line(t_uth_hard_fail.depot_name.value_counts().head(10))
+    add_line('\nПримеры бригад (первые 10 по времени отправления):')
+    add_line(t_uth_hard_fail[t_uth_hard_fail.depot_name == t_uth_hard_fail.st_from_name].head(10)[cols])    
+
+
+# ### Проверка УТХ-бригад по одной станции
+
+# In[214]:
+
+#st_name = 'ИРКУТСК-СОРТИРОВОЧНЫЙ'
+st_name = 'СЛЮДЯНКА I'
+
+
+# In[215]:
+
+add_header('Проверка УТХ-бригад по депо %s' % st_name, h=2, p=False)
+
+
+# In[216]:
+
+team_info['depot_name'] = team_info.depot.map(st_names.name)
+
+#team_info.columns
+team_info['plan_start_time'] = team_info.team                        .map(team_plan[team_plan.state.isin([0, 1])].drop_duplicates('team').set_index('team').time_start)
+team_info['plan_start_time_f'] = team_info['plan_start_time'].apply(nice_time)
+
+
+# In[217]:
+
+irk_uth = team_info[(team_info.depot_name == st_name) & (team_info.uth == 1)]
+add_header('Все УТХ-бригады из депо %s (%d):' % (st_name, irk_uth.team.count()))
+cols = ['team', 'depot_name', 'uth', 'state', 'is_assign', 'presence_norm', 'plan_start_time_f']
+pd.set_option('display.max_colwidth', 50)
+add_line(irk_uth.sort_values('presence')[cols])
+t_max = irk_uth.presence.max()
+t_plan_max = irk_uth.plan_start_time.max()
+add_line('Максимальное время явки УТХ-бригад депо %s: %s' % (st_name, nice_time(t_max)))
+add_line('Максимальное время отправления УТХ-бригад депо %s: %s' % (st_name, nice_time(t_plan_max)))
+
+
+# In[218]:
+
+cols = ['team', 'depot_name', 'depot_st_name', 'uth', 'state', 'loc_name', 'is_assign', 'presence_norm', 'plan_start_time_f']
+irk_no_uth = team_info[(team_info.depot_name == st_name) & (team_info.uth == 0) & (team_info.state == '3')]
+irk_no_uth.loc_name.value_counts()
+
+
+# In[219]:
+
+print(irk_no_uth[irk_no_uth.loc_name == irk_no_uth.depot_name].plan_start_time.min() > t_max)
+print(irk_no_uth[irk_no_uth.loc_name == irk_no_uth.depot_name].plan_start_time.min() > t_plan_max)
+
+
+# In[220]:
+
+irk_no_uth[irk_no_uth.loc_name != irk_no_uth.depot_name][cols]
+
+
+# In[221]:
+
+cols = ['team', 'st_from_name', 'loc_name', 'state', 'presence_norm', 'time_start_f', 'uth', 'delta']
+team_plan['delta'] = team_plan.time_start - team_plan.presence
+add_header('Все запланированные бригады, отправленные со станции %s из начального state = 3' % st_name)
+tp = team_plan[(team_plan.depot_name == st_name) 
+          & (team_plan.state_info == '3') 
+          & (team_plan.state.isin([0, 1]))
+          & (team_plan.loc_name == st_name)]
+add_line(tp.drop_duplicates('team').sort_values('time_start')[cols])
+
+
+# In[222]:
+
+(tp[tp.uth == 1].drop_duplicates('team').delta / 3600).describe()
+
+
+# ### Для бригад из депо, по которым нет УТХ-бригад, не должно быть большого сдвига времени явки
+
+# In[223]:
+
+team_plan['depot_time_f'] = team_plan.depot_time.apply(nice_time)
+ts = team_plan[(team_plan.uth == 0) & (team_plan.depot.isin(uth_depots) == False) & (team_plan.state_info == '3')].copy()
+ts['delta'] = ts.time_start - ts.depot_time
+cols = ['team', 'st_from_name', 'loc_name', 'depot_name', 'time_start_f', 'depot_time_f', 'delta']
+ts.drop_duplicates('team')[cols]
+delta75 = (ts.drop_duplicates('team').delta / 3600).describe()['75%']
+if delta75 < 5:
+    add_header('У 75% бригад из депо, по которым нет УТХ-бригад, разница между переданным и запланированным временем явки'
+              + ' составляет меньше %.2f ч. (это ОК)' % delta75)
+else:
+    add_header('WARNING: разница между планируемым и переданным временем явки у бригад из депо, по которым нет УТХ-бригад' +
+              'выглядит завышенной')
+    ts[ts.delta > 5].sort_values('delta', ascending=False).head(10)[cols]
+
+
+# ### План проверок порядка отправления бригад
+# 
+# 1. Взять станцию (Слюдянка - с ней проще, поскольку, вроде бы, нет бригад депо Слюдянка, которые находятся на других станциях), собрать все бригады, которые на начало планирования находились на этой станции.
+# 2. Собрать все бригады, у которых запланирован отдых на этой станции. Рассчитать время выхода с отдыха (можно грубо: +3 часа от времени прибытия).
+# 3. Выстроить эти бригады в порядке готовности к отправлению из Слюдянки. Нужные параметры: депо приписки, участки обкатки, время готовности.
+# 4. Составить список поездов (и их локомотивов), которые проходят через Слюдянку и у которых запланирована смена бригады в Слюдянке. Выстроить эти поезда по времени прибытия в Слюдянку.
+# 5. Сличить два списка. Найти случаи, когда бригады привязываются "вразнобой". Исследовать значения функций полезности. Найти распределение времен ожидания бригад, стоянок и пр.
+
+# In[235]:
+
+uth = list(pd.read_csv('./input/a.csv', header=None)[0].values)
+uth = [str(x) for x in uth]
+add_line(team_info[(team_info.team.isin(uth)) & (team_info.state == '3')
+         & (team_info.loc_name != team_info.depot_name)][['team', 'depot_name', 'loc_name', 'state']])
+
+
 # ## Экспорт в HTML [ToC](#toc)
 
-# In[86]:
+# In[225]:
 
 filename = REPORT_FOLDER + 'team_report_' + time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time())) + '.html'
 create_report(filename)
