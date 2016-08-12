@@ -46,7 +46,7 @@
 # 4. [Цифры по связанности для выгрузки в Excel](#excel)
 # 5. [Запаздывание операций](#lag)
 
-# In[1]:
+# In[ ]:
 
 report = ''
 FOLDER = 'resources/'
@@ -54,7 +54,7 @@ REPORT_FOLDER = 'report/'
 PRINT = False
 
 
-# In[2]:
+# In[ ]:
 
 def add_line(line, p=PRINT):    
     global report        
@@ -104,7 +104,7 @@ def create_report(filename):
     print('Время выполнения: %.2f сек.' % (time.time() - start_time))
 
 
-# In[3]:
+# In[ ]:
 
 import numpy as np
 import pandas as pd
@@ -144,7 +144,7 @@ print('Log time: %d, %s' % (current_time, time.ctime(current_time)))
 print('Read csvs:', np.round(time.time() - start_time, 2), 'sec')
 
 
-# In[4]:
+# In[ ]:
 
 # Мержим таблицы _plan и _info для поездов, локомотивов и бригад
 # Добавляем во все таблицы названия станций на маршруте и времена отправления/прибытия в читабельном формате
@@ -189,7 +189,7 @@ team_plan = team_plan.merge(team_info, on='team', suffixes=('', '_info'), how='l
 team_plan['team_type'] = team_plan.team.apply(lambda x: 'Реальная' if str(x)[0] == '2' else 'Фейковая')
 
 
-# In[5]:
+# In[ ]:
 
 add_line('Время запуска планировщика: %s' % nice_time(current_time))
 add_header('Тестирование входных данных в планировщике', h=1, p=False)
@@ -198,12 +198,12 @@ add_header('Тестирование входных данных в планир
 # <a id='21'></a>
 # ## Тесты нормативно-справочной информации [ToC](#toc)
 
-# In[6]:
+# In[ ]:
 
 add_header('2.1. Тесты нормативно справочной информации', h=2, p=False)
 
 
-# In[7]:
+# In[ ]:
 
 result = {}
 
@@ -211,12 +211,12 @@ result = {}
 # <a id='211'></a>
 # ### Количество станций [ToC](#toc)
 
-# In[8]:
+# In[ ]:
 
 add_header('2.1.1. Количество станций', h=3, p=False)
 
 
-# In[9]:
+# In[ ]:
 
 st_num = stations.station.drop_duplicates().count()
 if st_num > 0:
@@ -230,12 +230,12 @@ else:
 # <a id='212'></a>
 # ### Станции смены бригад [ToC](#toc)
 
-# In[10]:
+# In[ ]:
 
 add_header('2.1.2. Станции смены бригад', h=3, p=False)
 
 
-# In[11]:
+# In[ ]:
 
 st_norm_time = stations[stations.norm_time != 0]
 st_norm_time_n = st_norm_time.station.drop_duplicates().count()
@@ -250,7 +250,7 @@ else:
 # <a id='213'></a>
 # ### Станции смены локомотивов [ToC](#toc)
 
-# In[12]:
+# In[ ]:
 
 add_header('2.1.3. Станции смены локомотивов', h=3, p=False)
 
@@ -258,12 +258,12 @@ add_header('2.1.3. Станции смены локомотивов', h=3, p=Fal
 # <a id='214'></a>
 # ### Покрытие тяговыми плечами [ToC](#toc)
 
-# In[13]:
+# In[ ]:
 
 add_header('2.1.4. Покрытие тяговыми плечами', h=3, p=False)
 
 
-# In[14]:
+# In[ ]:
 
 links['link'] = list(zip(links.st_from, links.st_to))
 add_info(links)
@@ -284,12 +284,12 @@ else:
 # <a id='215'></a>
 # ### Покрытие участками обкатки бригад [ToC](#toc)
 
-# In[15]:
+# In[ ]:
 
 add_header('2.1.5. Покрытие участками обкатки бригад', h=3, p=False)
 
 
-# In[16]:
+# In[ ]:
 
 if 'link_eval' not in twr.columns:
     twr['link_eval'] = twr.link.apply(literal_eval)
@@ -317,7 +317,7 @@ else:
 # <a id='22'></a>
 # ## Тесты по поездам [ToC](#toc)
 
-# In[17]:
+# In[ ]:
 
 add_header('2.2. Тесты по поездам', h=2, p=False)
 
@@ -325,13 +325,13 @@ add_header('2.2. Тесты по поездам', h=2, p=False)
 # <a id='221'></a>
 # ### Простые тесты (поезда переданы без дублирования, с заполненными атрибутами и местоположением) [ToC](#toc)
 
-# In[18]:
+# In[ ]:
 
 add_header('2.2.1. Поезда переданы в планировщик', h=3, p=False)
 result['2.2.1'] = True
 
 
-# In[19]:
+# In[ ]:
 
 train_n = train_info.train.drop_duplicates().count()
 if train_n > 0:
@@ -342,7 +342,7 @@ else:
     result['2.2.1'] = result['2.2.1'] & False
 
 
-# In[20]:
+# In[ ]:
 
 tr = train_info.train.value_counts()
 non_unique_trains = tr.loc[tr > 1]
@@ -355,7 +355,7 @@ else:
     result['2.2.1'] = result['2.2.1'] & False
 
 
-# In[21]:
+# In[ ]:
 
 tr_bad_attr = train_info[(train_info.number.apply(lambda x: type(x) != np.int64))
                       | (train_info.weight.apply(lambda x: type(x) != np.int64))
@@ -371,7 +371,7 @@ else:
     result['2.2.1'] = result['2.2.1'] & False
 
 
-# In[22]:
+# In[ ]:
 
 routes = pd.read_csv(FOLDER + 'routes.csv', converters={'train':str, 'st_from':str, 'st_to':str})
 add_info(routes)
@@ -387,7 +387,7 @@ else:
     result['2.2.1'] = result['2.2.1'] & False    
 
 
-# In[23]:
+# In[ ]:
 
 tr_bad_loc = train_info[(train_info.oper_location.isnull()) | (train_info.oper_location == '-1')]
 tr_bad_loc_n = tr_bad_loc.train.drop_duplicates().count()
@@ -404,7 +404,7 @@ else:
 # <a id='222'></a>
 # ### Корректность фактов о местоположении [ToC](#toc)
 
-# In[24]:
+# In[ ]:
 
 add_header('2.2.2. Корректность фактов о местоположении поездов', h=3, p=False)
 result['2.2.2'] = True
@@ -413,7 +413,7 @@ result['2.2.2'] = True
 # <a id='2221'></a>
 # #### Присутствие станции или участка в соответствующем справочнике [ToC](#toc)
 
-# In[25]:
+# In[ ]:
 
 pd.set_option('display.max_colwidth', 50)
 bad_loc_st = train_info[(train_info.st_from == '-1') & (train_info.oper_location.isin(stations.station) == False)]
@@ -446,7 +446,7 @@ pd.set_option('display.max_colwidth', 30)
 # <a id='2222'></a>
 # #### Присутствие станции или участка в маршруте поезда [ToC](#toc)
 
-# In[26]:
+# In[ ]:
 
 def check_route(oper, df):
     a = train_info[(train_info.oper == oper) & (train_info.train.isin(df.train) == False)]
@@ -482,13 +482,13 @@ for key in check_dict.keys():
 # <a id='223'></a>
 # ### Корректное время отправления поезда [ToC](#toc)
 
-# In[27]:
+# In[ ]:
 
 add_header('2.2.3. Корректное время отправления поездов', h=3, p=False)
 result['2.2.3'] = True
 
 
-# In[28]:
+# In[ ]:
 
 current_time_f = time.strftime(time_format, time.localtime(current_time))
 train_info['time_delta'] = current_time - train_info.oper_time
@@ -501,7 +501,7 @@ cols = ['train', 'link', 'oper_time', 'oper_time_f', 'current_time_f', 'time_del
 
 # #### Проверка поездов, отправленных до начала планирования
 
-# In[29]:
+# In[ ]:
 
 past_deps = train_info[(train_info.oper == 'depart') & (train_info.time_delta > 3 * train_info.tt_link)]
 if not past_deps.empty:    
@@ -518,7 +518,7 @@ else:
 
 # #### Проверка поездов, отправленных после начала планирования
 
-# In[30]:
+# In[ ]:
 
 # future
 future_deps = train_info[(train_info.oper == 'depart') & (train_info.time_delta < 0)]
@@ -534,7 +534,7 @@ else:
     result['2.2.3'] = result['2.2.3'] & True
 
 
-# In[31]:
+# In[ ]:
 
 sns.set(context='notebook', style='whitegrid', color_codes='dark')
 fig, ax = plt.subplots(ncols=2, nrows=1, figsize=(12, 4))
@@ -550,12 +550,12 @@ sns.despine()
 # <a id='224'></a>
 # ### Связь поезда с локомотивом [ToC](#toc)
 
-# In[32]:
+# In[ ]:
 
 add_header('2.2.4. Связь поезда с локомотивом', h=3, p=False)
 
 
-# In[33]:
+# In[ ]:
 
 train_dep = train_info[train_info.oper == 'depart']
 train_dep_total = colcount(train_dep, 'train')
@@ -563,7 +563,7 @@ train_dep_total = colcount(train_dep, 'train')
 
 # #### Несколько локомотивов, ссылающихся на поезд
 
-# In[34]:
+# In[ ]:
 
 a = loco_info.groupby('train').loco.unique().apply(len).sort_values()
 train_info['locos'] = train_info.train.map(loco_info.groupby('train').loco.unique())
@@ -583,7 +583,7 @@ else:
 
 # #### Поезд на перегоне без локомотива, ссылающегося на него
 
-# In[35]:
+# In[ ]:
 
 no_loco = train_info[(train_info.locos.isnull()) & (train_info.oper == 'depart')]
 if no_loco.empty:
@@ -600,7 +600,7 @@ else:
 
 # #### Различное местоположение поезда и ссылающегося на него локомотива
 
-# In[36]:
+# In[ ]:
 
 train_info['loco_location'] = train_info.train.map(loco_info.groupby('train').oper_location.unique())
 train_info['loco_loc_name'] = train_info.train.map(loco_info.groupby('train').loc_name.unique())
@@ -624,7 +624,7 @@ else:
 
 # #### Различное время отправления поезда и ссылающегося на него локомотива
 
-# In[37]:
+# In[ ]:
 
 train_info['loco_time'] = train_info.train.map(loco_info.groupby('train').oper_time.unique())
 train_info['loco_time_f'] = train_info.train.map(loco_info.groupby('train').oper_time_f.unique())
@@ -653,16 +653,16 @@ else:
 # Список проверок:
 # 1. Если у поезда есть непустой атрибут `joint`, то должен быть еще хотя бы один поезд, у которого в атрибуте `joint` указано это же значение.
 # 2. Если у поезда есть непустой атрибут `joint`, то среди поездов на входе должен быть поезд с `id`, указанным в этом атрибуте.
-# 3. Местоположение сдвоенного поезда должно принадлежать маршруту этого сдвоенного поезда (проверяется среди обычных проверок выше).
+# 3. Все поезда, имеющие номер больше 9000, являются сдвоенными (то есть имеют несколько обычных поездов, ссылающихся на них).
 
-# In[38]:
+# In[ ]:
 
 add_header('2.2.5. Соединенные поезда', h=3, p=False)
 
 
 # #### Соединенные поезда состоят ровно из двух обычных поездов [ToC](#toc)
 
-# In[39]:
+# In[ ]:
 
 info_cols = ['train', 'number', 'weight', 'length', 'joint', 'joint_number', 'num_in_joint']
 train_info['joint_number'] = train_info.joint.map(train_info[['train', 'number']].set_index('train').number)
@@ -670,7 +670,7 @@ train_info['num_in_joint'] = train_info.joint.map(train_info[train_info.joint !=
 in_joint = train_info[train_info.joint != '-1']
 
 correct_num = 2
-incorrect = train_info[(train_info.num_in_joint.isnull() == False) 
+incorrect = train_info[(train_info.num_in_joint.notnull()) 
                        & (train_info.num_in_joint != correct_num)][info_cols]
 incorrect_n = colcount(incorrect, 'joint')
 total = in_joint.joint.drop_duplicates().count()
@@ -692,13 +692,13 @@ for n in sorted(in_joint.num_in_joint.unique()):
 
 # #### По всем сдвоенным поездам есть входные данные [ToC](#toc)
 
-# In[40]:
+# In[ ]:
 
 train_info['num_included'] = train_info.train.map(in_joint.drop_duplicates('joint').set_index('joint').num_in_joint)
 joints = train_info[train_info.train.isin(train_info.joint.drop_duplicates())]
-add_header('Всего %d сдвоенных поездов (из %d, %.2f%%) с входными данными:' 
-      % (joints.train.count(), total, 100 * joints.train.count() / total))
-add_line(joints.sort_values('number')[['train', 'number', 'weight', 'length', 'num_included']])
+# add_header('Всего %d сдвоенных поездов (из %d, %.2f%%) с входными данными:' 
+#       % (joints.train.count(), total, 100 * joints.train.count() / total))
+# add_line(joints.sort_values('number')[['train', 'number', 'weight', 'length', 'num_included']])
 
 joint_no_info = in_joint[in_joint.joint_number.isnull()].drop_duplicates('joint')
 if joint_no_info.empty:
@@ -711,15 +711,25 @@ else:
     result['2.2.5'] = result['2.2.5'] & False
 
 
+# In[ ]:
+
+trains9000 = train_info[train_info.number >= 9000]
+cols = ['train', 'number', 'ind434', 'joint', 'oper', 'oper_time_f', 'loc_name']
+trains9000_joint = trains9000[trains9000.joint != '-1']
+add_header('Всего %d (%.2f%%) поездов с номерами > 9000 имеют ссылку на сдвоенный поезд (якобы едут в составе сдвоенного)' 
+          % (trains9000_joint.train.count(), 100 * trains9000_joint.train.count() / trains9000.train.count()))
+add_line(trains9000_joint.head(10)[cols])
+
+
 # <a id='23'></a>
 # ## Тесты по локомотивам [ToC](#toc)
 
-# In[41]:
+# In[ ]:
 
 add_header('2.3. Тесты по локомотивам', h=2, p=False)
 
 
-# In[42]:
+# In[ ]:
 
 loco_info['ser_name'] = loco_info.series.map(loco_series.set_index('ser_id').ser_name)
 
@@ -727,12 +737,12 @@ loco_info['ser_name'] = loco_info.series.map(loco_series.set_index('ser_id').ser
 # <a id='231'></a>
 # ### 2.3.1. Простые тесты по локомотивам [ToC](#toc)
 
-# In[43]:
+# In[ ]:
 
 LOCO_EXPECTED_NUMBER = 1500
 
 
-# In[44]:
+# In[ ]:
 
 result['2.3.1'] = True
 loco_n = colcount(loco_info, 'loco')
@@ -747,12 +757,12 @@ else:
 # <a id='232'></a>
 # ### 2.3.2. Местоположение локомотивов [ToC](#toc)
 
-# In[45]:
+# In[ ]:
 
 add_header('2.3.2. Местоположение локомотивов', h=3, p=False)
 
 
-# In[46]:
+# In[ ]:
 
 loco_bad_loc = loco_info[(loco_info.oper_location.isnull()) | (loco_info.oper_location == '-1')]
 loco_bad_loc_n = colcount(loco_bad_loc, 'loco')
@@ -766,7 +776,7 @@ else:
     result['2.3.2'] = False
 
 
-# In[47]:
+# In[ ]:
 
 pd.set_option('display.max_colwidth', 50)
 bad_loc_st = loco_info[(loco_info.st_from == '-1') & (loco_info.oper_location.isin(stations.station) == False)]
@@ -799,12 +809,12 @@ pd.set_option('display.max_colwidth', 30)
 # <a id='233'></a>
 # ### 2.3.3. Время и пробег до ТО-2 [ToC](#toc)
 
-# In[48]:
+# In[ ]:
 
 add_header('2.3.3. Время и пробег до ТО-2', h=3, p=False)
 
 
-# In[49]:
+# In[ ]:
 
 info_cols = ['loco', 'ser_name', 'oper_location', 'oper_time', 'dts', 'tts']
 loco_n = loco_info.loco.drop_duplicates().count()
@@ -834,12 +844,12 @@ add_line('Всего локомотивов с замененными време
 # <a id='234'></a>
 # ### 2.3.4. Связь локомотива с поездом [ToC](#toc)
 
-# In[50]:
+# In[ ]:
 
 add_header('2.3.4. Связь локомотива с поездом', h=3, p=False)
 
 
-# In[51]:
+# In[ ]:
 
 info_cols = ['loco', 'ser_name', 'oper_time', 'st_from_name', 'st_to_name', 'train']
 loco_info['link'] = list(zip(loco_info.st_from, loco_info.st_to))
@@ -854,7 +864,7 @@ loco_dep_correct_n = colcount(loco_dep_correct, 'loco')
 add_line('Всего %d локомотивов на корректных участках' % loco_dep_correct_n)
 
 
-# In[52]:
+# In[ ]:
 
 info_cols = ['loco', 'ser_name', 'oper_time', 'st_from_name', 'st_to_name', 'train']
 loco_train = loco_info[(loco_info.train != '-1')]
@@ -869,7 +879,7 @@ else:
     result['2.3.4'] = False
 
 
-# In[53]:
+# In[ ]:
 
 info_cols = ['loco', 'oper_location', 'st_from_name', 'st_to_name', 'train', 'train_oper', 'train_location']
 loco_dep_location_fail = loco_train[(loco_train.loco.isin(loco_dep_train_nan.loco) == False)
@@ -884,7 +894,7 @@ else:
     result['2.3.4'] = result['2.3.4'] & False
 
 
-# In[54]:
+# In[ ]:
 
 info_cols = ['loco', 'oper_location', 'oper_time', 'st_from_name', 'st_to_name', 
              'train', 'train_oper', 'train_location', 'train_oper_time']
@@ -906,19 +916,19 @@ else:
 # <a id='235'></a>
 # ### 2.3.5. Связь локомотива с бригадой [ToC](#toc)
 
-# In[55]:
+# In[ ]:
 
 add_header('2.3.5. Связь локомотива с бригадой', h=3, p=False)
 
 
-# In[56]:
+# In[ ]:
 
 lteams = team_info[team_info.loco != '-1'].groupby('loco').team.unique()
 loco_info['all_teams'] = loco_info.loco.map(lteams)
 loco_info['teams_n'] = loco_info.all_teams.apply(lambda x: 0 if type(x) == float else len(x))
 
 
-# In[57]:
+# In[ ]:
 
 info_cols = ['loco', 'oper_location', 'oper_time', 'st_from_name', 'st_to_name']
 pd.set_option('display.max_colwidth', 40)
@@ -937,7 +947,7 @@ else:
 pd.set_option('display.max_colwidth', 30)
 
 
-# In[58]:
+# In[ ]:
 
 info_cols = ['loco', 'oper_time', 'st_from_name', 'st_to_name', 'all_teams', 'teams_n']
 pd.set_option('display.max_colwidth', 35)
@@ -954,7 +964,7 @@ else:
 pd.set_option('display.max_colwidth', 30)
 
 
-# In[59]:
+# In[ ]:
 
 # Проверку на совпадение местоположения и времени операции будем делать от бригад, поскольку у локомотивов может быть 2+ бригад
 # во входных данных
@@ -964,7 +974,7 @@ team_info['loco_oper_time'] = team_info.loco.map(loco_info.set_index('loco').ope
 team_info['loco_oper_time_f'] = team_info.loco_oper_time.apply(lambda x: nice_time(x))
 
 
-# In[60]:
+# In[ ]:
 
 info_cols = ['loco', 'loco_location', 'team', 'oper_location', 'state']
 pd.set_option('display.max_colwidth', 50)
@@ -982,7 +992,7 @@ else:
 pd.set_option('display.max_colwidth', 30)
 
 
-# In[61]:
+# In[ ]:
 
 info_cols = ['loco', 'loco_location', 'loco_oper_time', 'team', 'oper_location', 'oper_time']
 loco_team_time_fail = team_info[(team_info.loco != '-1') & (team_info.oper_time != team_info.loco_oper_time)]
@@ -1000,12 +1010,12 @@ else:
 # <a id='236'></a>
 # ### 2.3.6. Наличие локомотивов на всех тяговых плечах [ToC](#toc)
 
-# In[62]:
+# In[ ]:
 
 add_header('2.3.6. Наличие локомотивов на всех тяговых плечах', h=3, p=False)
 
 
-# In[63]:
+# In[ ]:
 
 all_regs = stations.loco_region.unique()
 loco_info['regions_eval'] = loco_info.regions.apply(literal_eval)
@@ -1024,12 +1034,12 @@ else:
 # <a id='237'></a>
 # ### 2.3.7. Покрытие локомотивами всех участков планирования [ToC](#toc)
 
-# In[64]:
+# In[ ]:
 
 add_header('2.3.7. Покрытие локомотивами всех участков планирования', h=3, p=False)
 
 
-# In[65]:
+# In[ ]:
 
 links['has_loco'] = links.link_regs.apply(lambda x: any(str(reg) in regs_in_loco for reg in x) if type(x) != float else False)
 links['link_name'] = list(zip(links.st_from_name, links.st_to_name))
@@ -1046,7 +1056,7 @@ else:
     result['2.3.7'] = False
 
 
-# In[66]:
+# In[ ]:
 
 big_stations = stations[stations.norm_time != 0].drop_duplicates('station')
 big_links_no_loco = links_no_loco[links_no_loco.st_from.isin(big_stations.station)]
@@ -1063,12 +1073,12 @@ else:
 # <a id='238'></a>
 # ### 2.3.8. Проверка корректности типа локомотива [ToC](#toc)
 
-# In[67]:
+# In[ ]:
 
 add_header('2.3.8. Проверка корректности типа локомотива', h=3, p=False)
 
 
-# In[68]:
+# In[ ]:
 
 good_series = ['2ТЭ10', '3ТЭ10', '2ЭС5К', '3ЭС5К', 'ВЛ80', 'ВЛ85']
 loco_info['ser_name'] = loco_info.series.map(loco_series.set_index('ser_id').ser_name)
@@ -1087,7 +1097,7 @@ else:
 # <a id='24'></a>
 # ## 2.4. Тесты по бригадам [ToC](#toc)
 
-# In[69]:
+# In[ ]:
 
 add_header('2.4. Тесты по бригадам', h=2, p=False)
 
@@ -1095,12 +1105,12 @@ add_header('2.4. Тесты по бригадам', h=2, p=False)
 # <a id='241'></a>
 # ### 2.4.1. Простые тесты [ToC](#toc)
 
-# In[70]:
+# In[ ]:
 
 TEAM_EXPECTED_NUMBER = 3000
 
 
-# In[71]:
+# In[ ]:
 
 result['2.4.1'] = True
 team_n = colcount(team_info, 'team')
@@ -1115,12 +1125,12 @@ else:
 # <a id='242'></a>
 # ### 2.4.2. Корректность местоположения и станций явки [ToC](#toc)
 
-# In[72]:
+# In[ ]:
 
 add_header('2.4.2. Корректность местоположения и станций явки', h=3, p=False)
 
 
-# In[73]:
+# In[ ]:
 
 cols = ['team', 'number', 'depot_st', 'loco', 'state', 'ready_type', 'is_depot_st']
 
@@ -1151,7 +1161,7 @@ add_line(bad_team_link.head()[cols])
 pd.set_option('display.max_colwidth', 30)
 
 
-# In[74]:
+# In[ ]:
 
 bad_team_link[['team', 'loco', 'state']]
 
@@ -1159,12 +1169,12 @@ bad_team_link[['team', 'loco', 'state']]
 # <a id='243'></a>
 # ### 2.4.3. Корректность данных по бригадам в зависимости от состояния [ToC](#toc)
 
-# In[75]:
+# In[ ]:
 
 add_header('2.4.3. Корректность данных по явке бригад в зависимости от состояния', h=3, p=False)
 
 
-# In[76]:
+# In[ ]:
 
 team_info['depot_time_f'] = team_info.depot_time.apply(lambda x: nice_time(x))
 team_info['return_time_f'] = team_info.depot_time.apply(lambda x: nice_time(x))
@@ -1177,7 +1187,7 @@ result['2.4.3'] = True
 # <a id='2431'></a>
 # #### 2.4.3.1. Бригада следует пассажиром (state = 0) [ToC](#toc)
 
-# In[77]:
+# In[ ]:
 
 result['2.4.3.1'] = True
 # state = 0. Это бригады, следующие пассажирами. Для них предполагается наличие участка планирования и, возможно, локомотива
@@ -1197,7 +1207,7 @@ else:
     add_header('WARN!! Всего бригад пассажирами', t_state1_n)        
 
 
-# In[78]:
+# In[ ]:
 
 ready_cols = ['team', 'ready_type', 'depot_st', 'depot_st_name', 'depot_time_f', 
               'return_st', 'return_st_name', 'return_time_f', 'rest_time_f']
@@ -1206,7 +1216,7 @@ team_info['is_rgd'] = (team_info.return_time > team_info.depot_time) & (team_inf
 team_info['is_restgdr'] = (team_info.rest_time > team_info.depot_time) & (team_info.rest_time > team_info.return_time)
 
 
-# In[79]:
+# In[ ]:
 
 t_state0_rdepot_fail = team_info.loc[(team_info.state == '0') &
               (team_info.ready_type == 'depot') &
@@ -1237,12 +1247,12 @@ else:
 # <a id='2432'></a>
 # #### 2.4.3.2. Бригада следует на локомотиве (state = 1) [ToC](#toc)
 
-# In[80]:
+# In[ ]:
 
 result['2.4.3.2'] = True
 
 
-# In[81]:
+# In[ ]:
 
 # state = 1. Это бригады, следующие с локомотивами. Для них предполагается наличие участка планирования и локомотива
 cols = ['team', 'state', 'st_from_name', 'st_to_name', 'loco']
@@ -1263,7 +1273,7 @@ else:
     add_header('WARN!! Во входных данных нет бригад в состоянии 1.')
 
 
-# In[82]:
+# In[ ]:
 
 t_state1_rdepot_fail = team_info[(team_info.state == '1') & (team_info.ready_type == 'depot') & (team_info.is_dgr == False)]
 if not t_state1_rdepot_fail.empty:
@@ -1276,7 +1286,7 @@ else:
     result['2.4.3.2'] = result['2.4.3.2'] & True
 
 
-# In[83]:
+# In[ ]:
 
 t_state1_rreturn_fail = team_info[(team_info.state == '1') & (team_info.ready_type == 'return') & (team_info.is_rgd == False)]
 if not t_state1_rreturn_fail.empty:
@@ -1293,12 +1303,12 @@ else:
 # <a id='2433'></a>
 # #### 2.4.3.3. Бригада находится на домашнем отдыхе или на явке в депо приписки (state = 2 или 3) [ToC](#toc)
 
-# In[84]:
+# In[ ]:
 
 result['2.4.3.3'] = True
 
 
-# In[85]:
+# In[ ]:
 
 # state = 2, 3. Это бригады с явкой в депо приписки или находящиеся на домашнем отдыхе
 cols = ['team', 'number', 'state', 'oper_location', 'st_from', 'st_to', 'loco']
@@ -1321,7 +1331,7 @@ else:
     add_header('WARN!! Нет бригад в состоянии 2 или 3')
 
 
-# In[86]:
+# In[ ]:
 
 t_state2_rr = t_state2.loc[t_state2.ready_type == 'return']
 t_state2_rr_n = len(t_state2_rr.index)
@@ -1347,12 +1357,12 @@ else:
 # <a id='2434'></a>
 # #### 2.4.3.4. Бригады на отдыхе в пункте оборота (state = 4) [ToC](#toc)
 
-# In[87]:
+# In[ ]:
 
 result['2.4.3.4'] = True
 
 
-# In[88]:
+# In[ ]:
 
 cols = ['team', 'state', 'oper_location', 'st_from', 'st_to', 'loco']
 team_info['rest_lag'] = np.round((current_time - team_info.rest_time) / 3600, 2)
@@ -1360,7 +1370,7 @@ team_info['work_time'] = np.round((team_info.rest_time - team_info.depot_time) /
 team_info['is_big_rest'] = team_info.rest_lag > team_info.work_time
 
 
-# In[89]:
+# In[ ]:
 
 # state = 4. Это бригады на отдыхе в пункте оборота
 t_state4 = team_info.loc[team_info.state == '4']
@@ -1380,7 +1390,7 @@ else:
     add_header('WARN!! Нет бригад в состоянии 4.')
 
 
-# In[90]:
+# In[ ]:
 
 # Поскольку эти бригады только находятся на отдыхе, то явки в пункте оборота не было и последняя явка должна быть в депо
 t_state4_rr = t_state4.loc[t_state4.ready_type == 'return']
@@ -1406,7 +1416,7 @@ else:
     result['2.4.3.4'] = result['2.4.3.4'] & True
 
 
-# In[91]:
+# In[ ]:
 
 big_rest_cols = ['team', 'ready_type', 'depot_st', 'depot_st_name', 'depot_time_f',
                  'rest_time_f', 'rest_lag', 'work_time', 'is_big_rest']
@@ -1423,12 +1433,12 @@ if (t_state4_big_rest_n > 0):
 # <a id='2435'></a>
 # #### 2.4.3.5. Бригады с локомотивами на станции (state = 5, 6 или 9) [ToC](#toc)
 
-# In[92]:
+# In[ ]:
 
 result['2.4.3.5'] = False
 
 
-# In[93]:
+# In[ ]:
 
 t_state5 = team_info.loc[team_info.state.isin(['5', '6', '9'])]
 t_state5_n = len(t_state5.index)
@@ -1448,7 +1458,7 @@ else:
     add_header('WARN!! Всего бригад на станции с локомотивом', t_state5_n)
 
 
-# In[94]:
+# In[ ]:
 
 t_state5_rdepot_fail = team_info.loc[(team_info.state.isin(['5', '6', '9'])) &
               (team_info.ready_type == 'depot') &
@@ -1480,12 +1490,12 @@ else:
 # <a id='2436'></a>
 # #### 2.4.3.6. Бригады, прибывшие на станцию с локомотивом (state = 7) [ToC](#toc)
 
-# In[95]:
+# In[ ]:
 
 result['2.4.3.6'] = True
 
 
-# In[96]:
+# In[ ]:
 
 # state = 7. Это бригады, прибывшие на станцию с локомотивом
 t_state7 = team_info.loc[team_info.state == '7']
@@ -1504,7 +1514,7 @@ else:
     add_header('WARN!! Всего бригад, прибывших пассажирами', t_state7_n)
 
 
-# In[97]:
+# In[ ]:
 
 t_state7_rdepot_fail = team_info.loc[(team_info.state == '7') &
               (team_info.ready_type == 'depot') &
@@ -1534,12 +1544,12 @@ else:
 # <a id='2437'></a>
 # #### 2.4.3.7. Бригады на явке в пункте оборота (state = 8) [ToC](#toc)
 
-# In[98]:
+# In[ ]:
 
 result['2.4.3.7'] = True
 
 
-# In[99]:
+# In[ ]:
 
 # state = 8. Это бригады на явке в пункте оборота
 t_state8 = team_info.loc[team_info.state == '8']
@@ -1560,7 +1570,7 @@ else:
     add_header('WARN!! Всего бригад на явке в пункте оборота', t_state8_n)
 
 
-# In[100]:
+# In[ ]:
 
 t_state8_rd = t_state8.loc[t_state8.ready_type == 'depot']
 t_state8_rd_n = len(t_state8_rd.index)
@@ -1584,7 +1594,7 @@ else:
     result['2.4.3.7'] = result['2.4.3.7'] & True
 
 
-# In[101]:
+# In[ ]:
 
 a = [result[key] for key in result.keys() if '2.4.5.' in key]
 result['2.4.3'] = True if sum(a) == len(a) else False
@@ -1593,12 +1603,12 @@ result['2.4.3'] = True if sum(a) == len(a) else False
 # <a id='244'></a>
 # ### 2.4.4. Связь бригад с локомотивами [ToC](#toc)
 
-# In[102]:
+# In[ ]:
 
 add_header('2.4.4. Связь бригад с локомотивами', h=3, p=False)
 
 
-# In[103]:
+# In[ ]:
 
 team_info['loco_location'] = team_info.loco.map(loco_info.set_index('loco').oper_location)
 team_info['loco_oper_time'] = team_info.loco.map(loco_info.set_index('loco').oper_time)
@@ -1607,7 +1617,7 @@ team_loco = team_info[team_info.loco != '-1']
 team_loco_n = colcount(team_loco, 'team')
 
 
-# In[104]:
+# In[ ]:
 
 info_cols = ['team', 'oper_location', 'st_from_name', 'st_to_name', 'loco', 'loco_location', 'loco_oper_time']
 team_no_loco = team_loco[team_loco.loco.isin(loco_info.loco) == False]
@@ -1622,7 +1632,7 @@ else:
     result['2.4.4'] = False
 
 
-# In[105]:
+# In[ ]:
 
 team_loco_location_fail = team_loco[(team_loco.loco.isin(loco_info.loco))
                                    & (team_loco.oper_location != team_loco.loco_location)]
@@ -1638,7 +1648,7 @@ else:
     result['2.4.4'] = result['2.4.4'] & False
 
 
-# In[106]:
+# In[ ]:
 
 team_loco_time_fail = team_loco[(team_loco.loco.isin(loco_info.loco))
                                    & (team_loco.oper_time != team_loco.loco_oper_time)]
@@ -1657,12 +1667,12 @@ else:
 # <a id='245'></a>
 # ### 2.4.5. Наличие бригад на всех участках обкатки [ToC](#toc)
 
-# In[107]:
+# In[ ]:
 
 add_header('2.4.5. Наличие бригад на всех участках обкатки', h=3, p=False)
 
 
-# In[108]:
+# In[ ]:
 
 twr['st_from_name'] = twr.st_from.map(st_names.name)
 twr['st_to_name'] = twr.st_to.map(st_names.name)
@@ -1689,12 +1699,12 @@ else:
 # <a id='246'></a>
 # ### 2.4.6. Покрытие бригадами всех участков планирования [ToC](#toc)
 
-# In[109]:
+# In[ ]:
 
 add_header('2.4.6. Покрытие бригадами всех участков планирования', h=3, p=False)
 
 
-# In[110]:
+# In[ ]:
 
 links['has_team'] = links.link_twr.apply(lambda x: any(str(reg) in regs_in_team for reg in x) if type(x) != float else False)
 links['link_name'] = list(zip(links.st_from_name, links.st_to_name))
@@ -1711,7 +1721,7 @@ else:
     result['2.4.6'] = False
 
 
-# In[111]:
+# In[ ]:
 
 big_stations = stations[stations.norm_time != 0].drop_duplicates('station')
 big_links_no_team = links_no_team[links_no_team.st_from.isin(big_stations.station)]
@@ -1728,14 +1738,14 @@ else:
 # <a id='247'></a>
 # ### 2.4.7. Проверка корректности типа бригады [ToC](#toc)
 
-# In[112]:
+# In[ ]:
 
 add_header('2.4.7. Проверка корректности типа бригады', h=3, p=False)
 
 
 # #### Добавление названий серий, заданных для бригады
 
-# In[113]:
+# In[ ]:
 
 ser_to_dict = loco_series[['ser_id', 'ser_name']].copy(deep = True)
 ser_to_dict['ser_id'] = ser_to_dict.ser_id.astype(str)
@@ -1747,7 +1757,7 @@ team_info[['team', 'number', 'ser_eval', 'ser_name', 'ttype']].head()
 
 # #### Выявление ошибочных и подозрительных бригад
 
-# In[114]:
+# In[ ]:
 
 def check_fail(team_ser_list, good_series):
     res = False
@@ -1782,12 +1792,12 @@ add_line(suspect_teams[['team', 'ser_name', 'ttype']].head())
 # <a id='res'></a>
 # ## Результаты тестов [ToC](#toc)
 
-# In[115]:
+# In[ ]:
 
 add_header('Результаты тестов', h=2, p=False)
 
 
-# In[116]:
+# In[ ]:
 
 for key in sorted(result.keys()):
     add_line('Тест %s = %s' % (key, result[key]))
@@ -1799,19 +1809,19 @@ add_line('\nВсего пройдено %d тестов из %d (%.2f%%)'
 # <a id='excel'></a>
 # ## Цифры по связанности для выгрузки в Excel [ToC](#toc)
 
-# In[117]:
+# In[ ]:
 
 add_header('Статистика по связанности для выгрузки в Excel', h=2, p=False)
 
 
-# In[118]:
+# In[ ]:
 
 train_dep_total = colcount(train_info[train_info.oper == 'depart'], 'train')
 train_total = colcount(train_info, 'train')
 print('Train-loco report:', train_total, train_dep_total, no_loco_n, fail_location_n + fail_time_n)
 
 
-# In[119]:
+# In[ ]:
 
 loco_train = loco_info[loco_info.train != '-1']
 loco_train_n = colcount(loco_train, 'loco')
@@ -1822,7 +1832,7 @@ loco_train_fail_op_n = colcount(loco_train[(loco_train.oper_location != loco_tra
 print('Loco-train report:', loco_n, loco_train_n, loco_train_no_train_n, loco_train_fail_op_n)
 
 
-# In[120]:
+# In[ ]:
 
 loco_info['loco_time'] = list(zip(loco_info.loco, loco_info.oper_time))
 team_info['loco_time'] = list(zip(team_info.loco, team_info.oper_time))
@@ -1838,7 +1848,7 @@ loco_dep_team_fail_op_n = colcount(loco_dep[(loco_dep.team.isnull() == False) & 
 print('Loco-team report:', loco_dep_n, loco_dep_no_team_n, loco_dep_team_fail_op_n)
 
 
-# In[121]:
+# In[ ]:
 
 team_info['loco_location'] = team_info.loco.map(loco_info.set_index('loco').oper_location)
 team_info['loco_oper_time'] = team_info.loco.map(loco_info.set_index('loco').oper_time)
@@ -1851,7 +1861,7 @@ team_loco_fail_op_n = colcount(team_info[(team_info.loco != '-1') & (team_info.l
 print('Team-loco report:', team_n, team_loco_n, team_loco_no_loco_n, team_loco_fail_op_n)
 
 
-# In[122]:
+# In[ ]:
 
 res = [train_total, train_dep_total, no_loco_n, fail_location_n + fail_time_n,
       loco_n, loco_train_n, loco_train_no_train_n, loco_train_fail_op_n,
@@ -1865,12 +1875,12 @@ add_line('Output: %s' % out)
 # <a id='lag'></a>
 # ## Запаздывание операций [ToC](#toc)
 
-# In[123]:
+# In[ ]:
 
 add_header('Запаздывание операций', h=2, p=False)
 
 
-# In[124]:
+# In[ ]:
 
 # У поезда операция train_ready может быть в будущем --- для поездов с подходов с ЗапСиба
 train_lag = current_time - train_info[(train_info.oper.isin(['depart', 'arrive'])) 
@@ -1884,13 +1894,13 @@ add_line('Минимальное отставание по операциям с
 
 # ## Экспорт в HTML
 
-# In[125]:
+# In[ ]:
 
 filename = REPORT_FOLDER + 'input_report_' + time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time())) + '.html'
 create_report(filename)
 
 
-# In[126]:
+# In[ ]:
 
 ready_cols = ['team', 'state', 'ready_type', 'depot_st', 'depot_time', 'return_st', 'return_time', 'rest_time', 'loco']
 
