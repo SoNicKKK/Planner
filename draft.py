@@ -1,9 +1,9 @@
-
+﻿
 # coding: utf-8
 
 # In[9]:
 
-get_ipython().magic('run common.py')
+#get_ipython().magic('run common.py')
 
 
 # In[10]:

@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # In[142]:
@@ -10,7 +10,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 sns.set(style='whitegrid', context='notebook')
 sns.set_color_codes('dark')
 
@@ -180,4 +180,264 @@ for k in [5, 20]:
 #k = [ for i in x ]
 plt.ylim(-0.2, 1.2)
 plt.legend()
+
+
+# In[5]:
+
+#get_ipython().magic('run read.py')
+#get_ipython().magic('run common.py')
+
+
+# In[15]:
+
+# pt = pd.read_csv(FOLDER + 'prev_team.csv')
+# pt.to_csv('prev.csv', index=False)
+pt = pd.read_csv('prev.csv', dtype={'team':str})
+pt['plan_ready_time'] = pt.team.map(team_plan[team_plan.state == 2].drop_duplicates('team').set_index('team').time_start)
+pt[pt.prev_ready_time != pt.plan_ready_time]
+
+
+# In[13]:
+
+a = pt[pt.prev_ready_time != pt.plan_ready_time].team
+cols = ['team', 'st_from_name', 'st_to_name', 'time_start', 'time_end', 'state', 'loco']
+for team in a:
+    print(team_plan[team_plan.team == team][cols].to_string(index=False))
+    print('\n')
+
+
+# In[23]:
+
+st1, st2 = 'ИРКУТСК-СОРТИРОВОЧНЫЙ', 'ГОНЧАРОВО'
+print(nice_time(current_time))
+train_plan['dt_start'] = train_plan.time_start.apply(datetime.datetime.fromtimestamp)
+train_plan['train_type'] = train_plan.train.apply(lambda x: int(x[0]))
+train_plan[(train_plan.st_from_name == st1) 
+           & (train_plan.st_to_name == st2)
+          & (train_plan.time_start < current_time * 24*3600)
+          & (train_plan.train_type != 8)].set_index('dt_start').train.resample('1H', 'count')
+
+
+# ## Метод аукционов
+
+# In[434]:
+
+r, c = 4, 4
+util = [float(i) for i in np.random.randint(10, size=r*c)]
+util = np.array(util).reshape(r, c)
+util0 = util.copy()
+util
+
+
+# In[435]:
+
+k0 = [i for i in range(util.shape[1]) if i%2==0]
+k1 = [i for i in range(util.shape[1]) if i%2==1]
+k0, k1
+best_rate = 1.0 # k0 / k_all
+
+
+# In[436]:
+
+def get_error(curr_rates, best_rates):
+    return round(np.sqrt(sum((np.array(curr_rates) - np.array(best_rates)) ** 2)) / len(best_rates), 4)
+
+
+# In[437]:
+
+from scipy import optimize
+row, col = optimize.linear_sum_assignment(-util)
+print(sum(util[row, col]))
+print(row, col)
+best_sum = sum(util0[row, col])
+eps, eps_err = 0.01, 0.00001
+
+curr_k0 = len([i for i in col if i in k0])
+curr_k1 = len([i for i in col if i in k1])
+total = len(col)
+std = get_error([curr_k0 / total, curr_k1 / total], [best_rate, 1 - best_rate])
+print(std)
+curr_rate = curr_k0 / (curr_k0 + curr_k1)
+curr_rate_err = curr_rate - best_rate
+print(curr_k0, curr_k1, curr_rate, best_rate, std)
+
+l = 0 if curr_rate_err > 0 else 1
+err_ind = [i for i in range(len(col)) if col[i]%2 == l]
+
+res, err_rate = [best_sum], [1000, std]
+assign = [(row, col)]
+print(res, err_rate)
+while (err_rate[-2] >= err_rate[-1]) & (err_rate[-1] != 0):
+    delta = []
+    for i in err_ind:
+        r, c = row[i], col[i]
+        m = max([j for j in util[r, k0] if util[r, c] > j])
+        delta.append(util[r, c] - m)
+        #print(r, c, delta)
+
+    d = min(delta) + eps
+    util[row[l], col[l]] -= d
+    row, col = optimize.linear_sum_assignment(-util)
+    print(row, col)    
+    l = 0 if curr_rate_err > 0 else 1
+    err_ind = [i for i in range(len(col)) if col[i]%2 == l]
+    res.append(sum(util0[row, col]))
+    curr_k0 = len([i for i in col if i in k0])
+    curr_k1 = len([i for i in col if i in k1])
+    curr_rate = curr_k0 / (curr_k0 + curr_k1)
+    curr_rate_err = curr_rate - best_rate
+    #err_rate.append(np.abs(curr_rate_err))
+    #print(res, curr_k0, curr_k1, curr_rate, best_rate, curr_rate_err)
+    std = get_error([curr_k0 / total, curr_k1 / total], [best_rate, 1 - best_rate])
+    err_rate.append(std)
+    print(res, curr_k0, curr_k1, curr_rate, best_rate, std)
+    assign.append((row, col))
+    #print(res, current_rate_err)    
+    
+print('End')
+# print(row, col)
+# print(sum(util[row, col]))
+# print(res, err_rate[1:])
+
+
+# In[433]:
+
+res_norm = 1 - res / best_sum
+err = np.sqrt(res_norm ** 2 + np.array(err_rate[1:]) ** 2) / 2
+print(res_norm)
+print(err_rate[1:])
+print(err)
+assign_ind = np.argmin(err)
+print(assign[assign_ind])
+print(sum(util0[assign[assign_ind]]))
+
+
+# In[438]:
+
+#get_ipython().magic('run common.py')
+
+
+# In[565]:
+
+lines = []
+with open('out.txt') as f:
+    for line in f:
+        lines.append(line[:-1])
+        
+a = [int(line.split('?')[-1].strip()) for line in lines[:18]]
+pd.Series(a).apply(datetime.datetime.fromtimestamp).sort_values()
+df_loco = pd.DataFrame([[line.split('?')[1].strip(), int(line.split('?')[-1].strip())] for line in lines[:18]], 
+                       columns=['loco', 'time'])
+
+
+# In[562]:
+
+b = [[line.split('?')[1].strip(), int(line.split('?')[-2].strip()), line.split('?')[-1].strip()] for line in lines[19:]]
+#teams = [line.split('?')[1].strip() for line in lines[19:]]
+#pd.Series(b).apply(datetime.datetime.fromtimestamp).sort_values()
+df_team = pd.DataFrame(b, columns=['team', 'time', 'loco'])
+df_team['dt'] = df_team.time.apply(datetime.datetime.fromtimestamp)
+df_team = df_team.set_index('team')
+df_team
+
+
+# In[527]:
+
+sns.set(style='whitegrid', context='notebook')
+plt.figure(figsize=(14, 4))
+plt.scatter(a, [0.0] * len(a), c='r', s=50, label='loco')
+plt.scatter(b, [1.0] * len(b), c='b', s=50, label='team')
+for i in range(len(a)):
+    plt.plot([a[i], b[i]], [0.0, 1.0], 'g--', lw=1.0)    
+    print('shift %d = %d' % (i, b[i]-a[i]))
+    plt.annotate(xy=(a[i]-250, -0.1), s=i)
+    
+for j in range(len(b)):
+    plt.annotate(xy=(b[j]-250, 1.1), s=j)   
+
+
+# In[528]:
+
+print(datetime.datetime.fromtimestamp(1470739560))
+print(datetime.datetime.fromtimestamp(1470756168))
+print(datetime.datetime.fromtimestamp(1470786408))
+print(datetime.datetime.fromtimestamp(1470773400))
+print(nice_time(current_time))
+
+
+# In[579]:
+
+df_team['line'] = ''
+e = {}
+with open('out2.txt', encoding='utf-8-sig') as f:
+    for line in f:
+        q = line[:-1].split(' - ')[1]
+        #team = q.split()[0][5:]
+        #loco = q.split()[1][5:]
+        l = [t for t in teams if t in q]
+        if l !=[]:
+            #print(l, line[line.find(' - ')+3:-1])
+            e[l[0]] = line[line.find(' - ')+3:-1]
+
+df_team = df_team.reset_index()
+df_team['line'] = df_team.team.apply(lambda x: e[x])
+df_team
+
+
+# In[581]:
+
+sns.set(style='whitegrid', context='notebook')
+b = df_team.time
+plt.figure(figsize=(14, 4))
+plt.scatter(a, [0.0] * len(a), c='r', s=50, label='loco')
+plt.scatter(b, [1.0] * len(b), c='b', s=50, label='team')
+good = df_team[df_team.line.apply(lambda x: 'Полезность' in x)].time
+plt.scatter(good, [1.0] * len(good), s=100, c='g')
+for i in range(len(a)):
+    plt.plot([a[i], b[i]], [0.0, 1.0], 'g--', lw=1.0)    
+    print('shift %d = %d' % (i, b[i]-a[i]))
+    plt.annotate(xy=(a[i]-250, -0.1), s=i)
+    
+for j in range(len(b)):
+    plt.annotate(xy=(b[j]-250, 1.1), s=j)
+    
+df_team['loco_time'] = df_team.loco.map(df_loco.set_index('loco').time)
+lt = df_team[df_team.loco != '0'].dropna().loco_time
+tt = df_team[df_team.loco != '0'].dropna().time
+for i in range(len(tt)):
+    plt.plot([lt, tt], [0.0, 1.0], c='black', lw=0.7)
+plt.legend(loc='best')
+
+
+# In[631]:
+
+def get_util(x):
+    u = []
+    for t_i in train_times:        
+        delta = COEF * (t_i - x.ts_norm)
+        util = np.exp(-(delta ** 2))
+        u.append(util)
+    return pd.Series(u)   
+
+df_loco['ts_norm'] = (df_loco.time - df_loco.time.min()) / (df_loco.time.max() - df_loco.time.min())
+df_team['ts_norm'] = (df_team.time - df_team.time.min()) / (df_team.time.max() - df_team.time.min())
+COEF = max(len(df_loco.ts_norm), len(df_team.ts_norm)) / 10
+#sh = df_team.ts_norm.min() - df_loco.ts_norm.min()
+#df_loco['ts_norm'] = df_loco.ts_norm + sh
+train_times = df_loco.ts_norm
+a = df_team.apply(lambda row: get_util(row), axis=1).applymap(lambda x: round(x, 3))
+#a.style.applymap(lambda x: 'background-color: yellow' if x > 0.5 else '')
+plt.figure(figsize=(12, 10))
+sns.heatmap(a, annot=True, lw=0.01)
+
+
+# In[625]:
+
+plt.scatter(df_loco.ts_norm, [0.0] * len(df_loco.ts_norm), s=50, c='r')
+plt.scatter(df_team.ts_norm, [1.0] * len(df_team.ts_norm), s=50, c='b')
+
+
+# In[ ]:
+
+
 
