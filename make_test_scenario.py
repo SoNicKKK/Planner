@@ -3,22 +3,31 @@
 
 # ## Создание файла с модельными входными данными
 # 
-# Тестовый полигон представляет из себя фрагмент сети между станциями Тайшет и Таксимо. Войтенко П.Е. была создана таблица с набором поездов, локомотивов и бригад, которые планировались к движению по этому фрагменту на сутки 30.07.2015. Данный скрипт из этой таблицы, а также из не меняющейся нормативно-справочной информации создает файл `test_scenario.log`, на котором можно запускать планировщик и проверять его работу на этом модельном сценарии.
+# Тестовый полигон представляет из себя фрагмент сети между станциями Тайшет и Таксимо. Войтенко П.Е. была создана таблица с набором поездов, локомотивов и бригад, которые планировались к движению по этому фрагменту на сутки 30.07.2015. Данный скрипт из этой таблицы, а также из не меняющейся нормативно-справочной информации создает файл `jason-FullPlannerPlugin_model.log`, на котором можно запускать планировщик и проверять его работу на этом модельном сценарии.
 
-# In[253]:
-
-#get_ipython().magic('run common.py')
-
+# 1. [Необходимые файлы](#Необходимые-файлы)
+# 1. [Алгоритм работы](#Алгоритм-работы)
+# 1. [Формирование данных по поездам](#Формирование-данных-по-поездам)
+# 1. [Формирование данных по локомотивам](#Формирование-данных-по-локомотивам)
+# 1. [Формирование данных по бригадам](#Формирование-данных-по-бригадам)
+# 1. [Формирование данных по станциям](#Формирование-данных-по-станциям)
+# 1. [Формирование данных по участкам планирования](#Формирование-данных-по участкам-планирования)
+# 1. [Формирование данных по пунктам ТО](#Формирование-данных-по-пунктам-ТО)
+# 1. [Формирование данных по участкам обслуживания бригад](#Формирование-данных-по-участкам-обслуживания-бригад)
+# 1. [Формирование данных по весовым нормам](#Формирование-данных-по-весовым-нормам)
+# 1. [Формирование данных по участкам обкатки бригад](#Формирование-данных-по-участкам-обкатки-бригад)
+# 1. [Формирование данных по ниткам](#Формирование-данных-по-ниткам)
+# 1. [Добавление заголовков и создание итогового файла](#Добавление-заголовков-и-создание-итогового-файла)
 
 # ### Необходимые файлы
 # 
 # 1. Путь к таблице Войтенко П.Е. указывается в переменной `input_filename`.
-# 2. Путь к папке, в которой будут храниться промежуточные файлы сценария и итоговый файл с входными данными, указывается в переменной `TEST_FOLDER`.
+# 2. Путь к папке, в которой будут храниться промежуточные файлы сценария и итоговый файл с входными данными, указывается в переменной `TEST_FOLDER` (для корректной работы папка `TEST_FOLDER` должна быть уже создана).
 # 3. Дополнительные файлы, которые используются при формировании входных данных, должны лежать в папке `TEST_FOLDER`:
 #   * файл `paths_id.csv` с путями между всеми станциями планирования.
 #   * файл `test_stations.xlsx` со списком станций модельного полигона.
 #   * файл `jason-FullPlannerPlugin.log` с реальными данными какого-либо запуска планировщика.
-# 3. Сsv-файлы, полученные в результате работы скрипта `read.py`, должны лежать в папке `resources`.
+# 3. Сsv-файлы, полученные в результате работы скрипта `read.py`, должны лежать в папке `FOLDER`. Оттуда нужны файлы `link.csv`, `station.csv` и `loco_series.csv`.
 # 
 # ### Алгоритм работы
 # 
@@ -26,20 +35,74 @@
 # 2. Данные по станциям (сообщения `station`) берутся из файла `test_stations.xlsx`. В станциях заменяются id тяговых плеч.
 # 3. Данные по участкам планирования (сообщения `link`) берутся из реальных данных и обрезаются в соответствии с тестовым полигоном.
 # 4. Весовые нормы (`loco_tonnage`) и пункты ТО (`service_station`) берутся из реальных данных и обрезаются в соответствии с данными тестового полигона (остаются данные только по нужным сериям локомотивов).
+#   1. Поскольку на участке Тайшет - Таксимо есть участки подталкивания, на которых весовые ограничения для одного локомотива довольно маленькие, то в тех случаях, когда максимальный вес для всех серий/секций на каком-то участке меньше 4000, он заменяется на 6000.
 # 5. Нитки (грузовые и пассажирские - `slot`, `slot_pass`) берутся из реальных данных и сдвигаются по времени с 00:00 29.07.2015 до 23:59 30.07.2015.
 # 6. Участки обкатки бригад (`team_work_region`) формируются скриптом. Из данных Войтенко берутся границы участков обкатки для каждой бригады, ищутся все участки планирования между этими границами. Формируются строки team_work_region с нужными id и набором треков.
 # 7. Участки обслуживания бригад (`team_region`) полностью копируются из реальных данных.
+# 8. Данные по каждой сущности записываются в отдельные csv-файлы, затем они собираются вместе в один выходной файл `jason-FullPlannerPlugin_model.log`.
 
-# In[254]:
+# In[886]:
+
+FOLDER = 'resources/'
+
+import numpy as np
+import pandas as pd
+import time, datetime
+from ast import literal_eval
+import matplotlib.pyplot as plt
+import seaborn as sns
+import zipfile
+
+time_format = '%b %d, %H:%M'
+
+#twr          = pd.read_csv(FOLDER + 'team_work_region.csv', converters={'twr':str})
+links        = pd.read_csv(FOLDER + 'link.csv')
+stations     = pd.read_csv(FOLDER + 'station.csv', converters={'station':str})
+loco_series  = pd.read_csv(FOLDER + 'loco_series.csv')
+
+st_names = stations[['station', 'name', 'esr']].drop_duplicates().set_index('station')
+
+def add_info(df):    
+    if 'st_from' in df.columns:
+        df['st_from_name'] = df.st_from.map(st_names.name)
+    if 'st_to' in df.columns:
+        df['st_to_name'] = df.st_to.map(st_names.name)
+    if 'time_start' in df.columns:
+        df['time_start_norm'] = df.time_start.apply(lambda x: time.strftime(time_format, time.localtime(x)))
+    if 'time_end' in df.columns:
+        df['time_end_norm'] = df.time_end.apply(lambda x: time.strftime(time_format, time.localtime(x)))
+    if 'oper_location' in df.columns:
+        df['oper_location_name'] = df.oper_location.map(st_names.name)    
+        df.oper_location_name.fillna(0, inplace=True)
+    if ('oper_location' in df.columns) & ('st_from' in df.columns) & ('st_to' in df.columns):        
+        df['loc_name'] = df.oper_location_name
+        df.loc[df.loc_name == 0, 'loc_name'] = df.st_from_name + ' - ' + df.st_to_name
+
+def nice_time(t):
+    #if not time_format: time_format = '%b %d, %H:%M'
+    return time.strftime(time_format, time.localtime(t)) if t > 0 else ''
+
+def nice_print(s, **kwargs):    
+    num = kwargs['num'] if 'num' in kwargs.keys() else False
+    cols = kwargs['cols'] if 'cols' in kwargs.keys() else s.columns
+    if num:
+        print(s.reset_index()[cols].to_string())
+    else:
+        print(s[cols].to_string(index=False))
+
+
+# In[887]:
 
 TEST_FOLDER = './test_scenario/'
 input_filename = './input/(Новые) 2.11.xlsx'
 paths = pd.read_csv(TEST_FOLDER + 'paths_id.csv', sep=';')
+stations = pd.read_csv(TEST_FOLDER + 'full_stations.csv', dtype={'station':str})
+st_names = stations.drop_duplicates('station').set_index('station')
 
 
 # ### Формирование данных по поездам
 
-# In[255]:
+# In[888]:
 
 df = pd.read_excel(input_filename, header=1)
 df.dropna(subset=['Номер поезда'], inplace=True)
@@ -56,19 +119,23 @@ df['st_to'] = df.st_to.map(stations.drop_duplicates('esr').set_index('esr').stat
 df.head()
 
 
-# In[256]:
+# In[889]:
+
+# Датафрейм с путями преобразуем в словарь. Это не обязательно, просто так чуть проще обращаться к нему для поиска.
+# Можно ограничиться просто set_index на датафрейм.
 
 paths = paths.dropna(how='any')
-paths
+d = paths.set_index(['ST_FROM', 'ST_TO'])[['ROUTE']].to_dict()['ROUTE']
+[int(float(i)) for i in d[2000036538, 2000036518].split(',')]
 
 
-# In[257]:
+# In[890]:
 
 def get_train_info(x, paths):    
     st_from = int(x['oper_st'])
     st_to = int(x['st_end'])
     try:
-        route = paths[(paths.ST_FROM == st_from) & (paths.ST_TO == st_to)].ROUTE.values[0].split(',')    
+        route = paths[(paths.ST_FROM == st_from) & (paths.ST_TO == st_to)].ROUTE.values[0].split(',')        
     except:
         print(x, st_from, st_to, paths[(paths.ST_FROM == st_from) & (paths.ST_TO == st_to)].columns)
         route = ''
@@ -79,17 +146,20 @@ a = df.apply(lambda x: get_train_info(x, paths), axis=1)
 a.to_csv(TEST_FOLDER + 'train_info.csv', index=False, sep=';')
 
 
-# In[258]:
+# In[891]:
 
 import datetime as dt
 def get_oper(x):
-    ts = int(x.oper_time.timestamp())
-    if x.oper_id == 2:        
-        s = '+train_depart(id(%s),track(station(%s),station(%s)),time(%s))' % (x.train_id, x.st_from, x.st_to, ts)
+    ts = int(round(x.oper_time.timestamp()))
+    if x.oper_id == 2:
+        r = [int(float(i)) for i in d[int(x.st_from), int(x.st_to)].split(',')[:2]]
+        s = '+train_depart(id(%s),track(station(%s),station(%s)),time(%s))' % (x.train_id, r[0], r[1], ts)       
     elif x.oper_id == 5:
         s = '+train_ready(id(%s),station(%s),time(%s))' % (x.train_id, x.oper_st, ts)
-    else:
-        s = '+train_arrive(id(%s),track(station(%s),station(%s)),time(%s))' % (x.train_id, x.st_from, x.st_to, ts)
+    else:        
+        r = [int(float(i)) for i in d[int(x.st_from), int(x.st_to)].split(',')[-2:]]
+        #print(x.train_id, x.st_from, x.st_to, r)
+        s = '+train_arrive(id(%s),track(station(%s),station(%s)),time(%s))' % (x.train_id, r[0], r[1], ts)
     return s        
     
 a = df.apply(lambda x: get_oper(x), axis=1)
@@ -98,7 +168,7 @@ a.to_csv(TEST_FOLDER + 'train_oper.csv', index=False, sep=';')
 
 # ### Формирование данных по локомотивам
 
-# In[259]:
+# In[892]:
 
 df_loco = pd.read_excel(input_filename, header=1, sheetname='ЛОК')
 df_loco.dropna(subset=['Борт НОМЕР'], inplace=True)
@@ -115,7 +185,7 @@ df_loco['st_to'] = df_loco.st_to.map(stations.drop_duplicates('esr').set_index('
 df_loco.head()
 
 
-# In[260]:
+# In[893]:
 
 def get_loco_info(x):
     ser_id = loco_series[loco_series.ser_name == x.ser_name].ser_id.values[0]
@@ -126,11 +196,30 @@ a = df_loco.apply(lambda x: get_loco_info(x), axis=1)
 a.to_csv(TEST_FOLDER + 'loco_attr.csv', index=False, sep=';')
 
 
-# In[261]:
+# In[894]:
+
+def get_loco_location(x):
+    ts = int(round(x.oper_time.timestamp()))
+    if x.oper == 5:        
+        state = 1
+        r = [int(float(i)) for i in d[int(x.st_from), int(x.st_to)].split(',')[:2]]
+        return '+fact_loco(id(%s),fact_time(%s),location(track(station(%s),station(%s),depart_time(%s),state(%s),train(%s))))' %            (x.loco_id, ts, r[0], r[1], ts, state, int(x.train_id))
+    elif x.oper in [64, 40, 94]:
+        return '+fact_loco(id(%s),fact_time(%s),location(station(%s)))' %            (x.loco_id, ts, x.oper_st)
+    elif x.oper in [1, 26]:
+        return '+fact_loco(id(%s),fact_time(%s),location(station(%s),arrive_time(%s),state(%s),train(%s)))' %             (x.loco_id, ts, x.oper_st, ts, 1, int(x.train_id))
+    else:
+        return -1
+
+a = df_loco.apply(lambda x: get_loco_location(x), axis=1)
+a.to_csv(TEST_FOLDER + 'loco_location.csv', index=False, sep=';')    
+
+
+# In[895]:
 
 def get_loco_service(x):
-    ts = int(x.oper_time.timestamp())
-    return '+fact_loco_next_service(id(%s),fact_time(%s),next_service(dist_to(%s),time_to(%s),type(2001889869)))' %    (x.loco_id, ts, 1000, int(x.tts) * 3600)
+    ts = int(round(x.oper_time.timestamp()))
+    return '+fact_loco_next_service(id(%s),fact_time(%s),next_service(dist_to(%s),time_to(%s),type(2001889869)))' %    (x.loco_id, ts, int(x.dts), int(x.tts) * 3600)
         
 a = df_loco.apply(lambda x: get_loco_service(x), axis=1)
 a.to_csv(TEST_FOLDER + 'loco_service.csv', index=False, sep=';')
@@ -138,7 +227,7 @@ a.to_csv(TEST_FOLDER + 'loco_service.csv', index=False, sep=';')
 
 # ### Формирование данных по бригадам
 
-# In[262]:
+# In[896]:
 
 '''
 В таблице Войтенко приведены коды депо приписок бригад. Депо, в общем случае, отличается от станций планирования, используемых
@@ -149,7 +238,7 @@ a.to_csv(TEST_FOLDER + 'loco_service.csv', index=False, sep=';')
 depot_st_dict = {318803:89370, 319212:90320, 359276:90440, 319201:92000, 319209:92440, 319210:92710, 359271:92570}
 
 
-# In[263]:
+# In[929]:
 
 df_team = pd.read_excel(input_filename, header=1, sheetname='ЛБР')
 df_team.dropna(subset=['Таб.номер'], inplace=True)
@@ -181,7 +270,12 @@ df_team.loco_id.replace(0, -1, inplace=True)
 df_team.head()
 
 
-# In[264]:
+# In[949]:
+
+df_team[df_team.team_id == 8800019].oper_time.apply(lambda x: int(round(x.timestamp())))
+
+
+# In[898]:
 
 def get_team_info(x):
     ser_list = x.ser_name.split('; ')
@@ -191,38 +285,46 @@ def get_team_info(x):
         ser_id = -1
     series = ','.join(['id(%s)' % s for s in ser_id])
     reg_id = ''.join([i for i in x.region if i.isnumeric()])
-    return '+team_attributes(id(%s),attributes([team_work_regions([id(%s)]),depot(station(%s)),loco_series([%s]),long_train(%s),heavy_train(%s),fake(1),type(1)]))' %    (x.team_id, reg_id, x.ready_st, series, int(x.long), int(x.heavy))
+    return '+team_attributes(id(%s),attributes([team_work_regions([id(%s)]),depot(station(%s)),loco_series([%s]),long_train(%s),heavy_train(%s),fake(0),type(1)]))' %    (x.team_id, reg_id, x.ready_st, series, int(x.long), int(x.heavy))
         
 a = df_team.apply(lambda x: get_team_info(x), axis=1)
 a.to_csv(TEST_FOLDER + 'team_attr.csv', index=False, sep=';')
 
 
-# In[265]:
+# In[945]:
 
 def get_team_ready(x):
     try:
-        depot_ts = int(x.depot_ready_time.timestamp()) if x.depot_ready_time != -1 else -1
-        return_ts = int(x.return_ready_time.timestamp())  if x.return_ready_time != -1 else -1
-        rest_start_ts = int(x.rest_start_time.timestamp())  if x.rest_start_time != -1 else -1
+        depot_ts = int(round(x.depot_ready_time.timestamp())) if x.depot_ready_time != -1 else -1
+        return_ts = int(round(x.return_ready_time.timestamp()))  if x.return_ready_time != -1 else -1
+        rest_start_ts = int(round(x.rest_start_time.timestamp()))  if x.rest_start_time != -1 else -1
     except:
         depot_ts, return_ts, rest_start_ts = -1, -1, -1
         print(x.team_id, x.depot_ready_time, x.return_ready_time, x.rest_start_time)
-    last_ready = 'depot' if depot_ts < return_ts else 'return'
+    if (x.return_ready_time == -1):
+        last_ready = 'depot'
+    elif (x.depot_ready_time == -1):
+        last_ready = 'return'
+    else:
+        last_ready = 'depot' if depot_ts >= return_ts else 'return'    
     return '+fact_team_ready(id(%s),ready_depot(time(%s),station(%s)),ready_return(time(%s),station(%s)),last_ready(%s),rest_start_time(%s))' %    (x.team_id, x.depot_ready_st, depot_ts, x.return_ready_st, return_ts, last_ready, rest_start_ts)
         
 a = df_team.apply(lambda x: get_team_ready(x), axis=1)
 a.to_csv(TEST_FOLDER + 'team_ready.csv', index=False, sep=';')
 
 
-# In[266]:
+# In[900]:
+
+# Словарь, в котором ключами являются состояния бригад (0...9), а значениями - коды последних операций с бригадами, которые
+# соответствуют этому состоянию. Подробнее можно посмотреть в документе "Алгортим планирования", раздел 4.3.2.
 
 states = {0:[33], 1:[2, 3], 2:[28, 30], 3:[31, 54], 4:[37], 5:[24, 26, 43], 6:[1, 42], 7:[34], 8:[35, 38], 9:[25, 41]}
 
 
-# In[267]:
+# In[951]:
 
 def get_team_location(x):
-    oper_time_ts = int(x.oper_time.timestamp())
+    oper_time_ts = int(round(x.oper_time.timestamp()))    
     try:
         state = [key for key, value in states.items() if x.oper_id in value][0]
     except:
@@ -230,9 +332,10 @@ def get_team_location(x):
         print(x.oper_id)
         
     if state in [0, 1]:
-        s = '+fact_team_location(id(%s),fact_time(%s),location(track(station(%s),station(%s))),oper_time(%s),loco(%s),pass_slot(-1),state(%s))' %            (x.team_id, oper_time_ts, x.st_from, x.st_to, oper_time_ts, int(x.loco_id), state)
+        r = [int(float(i)) for i in d[int(x.st_from), int(x.st_to)].split(',')[:2]]
+        s = '+fact_team_location(id(%s),fact_time(%s),location(track(station(%s),station(%s))),oper_time(%s),loco(%s),pass_slot(-1),state(%s))' %            (x.team_id, oper_time_ts, r[0], r[1], oper_time_ts, int(x.loco_id), state)
     else:
-        s = '+fact_team_location(id(%s),fact_time(%s),location(station(%s)),oper_time(%s),loco(%s),state(%s))' %            (x.team_id, oper_time_ts, x.oper_st, oper_time_ts, int(x.loco_id), state)
+        s = '+fact_team_location(id(%s),fact_time(%s),location(station(%s)),oper_time(%s),loco(%s),state(%s))' %            (x.team_id, oper_time_ts, x.oper_st, oper_time_ts, int(x.loco_id), state)    
     return s
         
 a = df_team.apply(lambda x: get_team_location(x), axis=1)
@@ -241,68 +344,71 @@ a.to_csv(TEST_FOLDER + 'team_location.csv', index=False, sep=';')
 
 # ### Формирование данных по станциям
 
-# In[268]:
-
-big_st = stations[stations.name.isin(['ЮРТЫ', 'ТАЙШЕТ', 'ЛЕНА', 'ТАКСИМО'])].drop_duplicates('name')
-big_st
-
-
-# In[269]:
-
-paths.columns = [col.lower() for col in paths.columns]
-p = paths.dropna().set_index(['st_from', 'st_to'])
-p['route'] = p.route.apply(lambda x: [int(float(r)) for r in x.split(',')])
-
-
-# In[270]:
-
-stations[stations.name.isin(['ЮРТЫ', 'ТАЙШЕТ', 'ЛЕНА', 'ТАКСИМО'])]
-regs = {'ЮРТЫ':['01'], 'ТАЙШЕТ':['01', '14'], 'ЛЕНА':['14', '47'], 'ТАКСИМО':['47']}
-
-
-# In[271]:
+# In[902]:
 
 def get_station(x):
     s = '+station(id(%s),loco_region(%s),service([]),norm_reserve([norm(weight_type(0),0),norm(weight_type(1),0)]),norm_time(%s))' %        (x.station, x.loco_region, x.norm_time)
     return s
 
-# arr = [str(x) for x in p.ix[2000036538, 2000036228].route]
-# stations[stations.station.isin(arr)].drop_duplicates('name').sort_values('esr').to_excel('test_stations.xlsx')
-
-st = pd.read_excel(TEST_FOLDER + 'test_stations.xlsx', converters={'loco_region':str, 'station':str})
-a = st.apply(get_station, axis=1)
+test_stations = pd.read_excel(TEST_FOLDER + 'test_stations.xlsx', converters={'loco_region':str, 'station':str})
+a = test_stations.apply(get_station, axis=1)
 a.to_csv(TEST_FOLDER + 'station.csv', index=False, sep=';')
 
 
 # ### Формирование данных по участкам планирования
 
-# In[272]:
+# In[903]:
 
 def get_links(x):
     return '+link(track(station(%s),station(%s)),attributes([duration(%s),distance(%s),push(0),direction(%s),lines(%s),road(%s)]))'         % (x.st_from, x.st_to, x.time, x.dist, x['dir'], x.lines, x.road)
 
 links = pd.read_csv(FOLDER + 'link.csv', dtype={'st_from':str, 'st_to':str})
-l = links[(links.st_from.isin(st.station)) & (links.st_to.isin(st.station))]
+l = links[(links.st_from.isin(test_stations.station)) & (links.st_to.isin(test_stations.station))]
 l.apply(get_links, axis=1).to_csv(TEST_FOLDER + 'link.csv', index=False, sep=';')
 
 
 # ### Формирование данных по пунктам ТО
 
-# In[273]:
+# In[904]:
+
+'''
+На реальном полигоне пункты ТО есть на всех крупных станциях модельного полигона, кроме станции Новый Уоян. Чтобы усложнить 
+задачу планировщику и приблизить ситуацию к реальной, было решено сделать пункты ТО с приоритетом 1 на границах тяговых плеч
+и один пункт ТО с приоритетом 2 в середине плеча (Вихоревка). 
+При возврате к реальным пунктам ТО надо учесть серии локомотивов, которые работают на модельном полигоне. Их можно посмотреть в 
+экселевской таблице (сейчас там есть только локомотивы серий ВЛ80Р и 3ЭС5К).
+'''
+
+PTOL_MODEL = {'ВЛ80Р':[('ТАЙШЕТ', 1), ('ЛЕНА', 1), ('ВИХОРЕВКА', 2)], 
+              '2ЭС5К':[('ЛЕНА', 1), ('ТАКСИМО', 1)], 
+              '3ЭС5К':[('ЛЕНА', 1), ('ТАКСИМО', 1)]}
+DEFAULT_SERVICE_TYPE = 2001889869
 
 def get_service_station(x):
     return '+service_station(id(%s),service_type(%s),series(%s),sections(%s),power_type(%s),priority(%s),duration(%s))'         % (x.station, x.stype, x.series, x.sections, x.ptype, x.priority, x.duration)
 
-ss = pd.read_csv(FOLDER + 'service_station.csv', dtype={'station':str})
-ss['name'] = ss.station.map(st_names.name)
-ss['ser_name'] = ss.series.map(loco_series.set_index('ser_id').ser_name)
-ss1 = ss[(ss.station.isin(st.station))].copy()
-ss1.apply(get_service_station, axis=1).to_csv(TEST_FOLDER + 'service_station.csv', index=False, sep=';')
+# ss = pd.read_csv(FOLDER + 'service_station.csv', dtype={'station':str})
+# ss['name'] = ss.station.map(st_names.name)
+# ss['ser_name'] = ss.series.map(loco_series.set_index('ser_id').ser_name)
+# ss1 = ss[(ss.station.isin(test_stations.station))].copy()
+#ss1.apply(get_service_station, axis=1).to_csv(TEST_FOLDER + 'service_station.csv', index=False, sep=';')
+
+lines = []
+for ser in PTOL_MODEL.keys():
+    ser_id = loco_series[loco_series.ser_name == ser].ser_id.values[0]
+    ptols = PTOL_MODEL[ser]
+    for st_name, pr in ptols:
+        st_id = stations[stations.name == st_name].station.values[0]
+        for sections in [2, 3]:
+            line = '+service_station(id(%s),service_type(%s),series(%s),sections(%s),power_type(%s),priority(%s),duration(%s))'                     % (st_id, DEFAULT_SERVICE_TYPE, ser_id, sections, 'ac', pr, 3*3600)
+            lines.append(line)
+
+pd.DataFrame(lines).to_csv(TEST_FOLDER + 'service_station.csv', index=False, sep=';', header=None)
 
 
 # ### Формирование данных по участкам обслуживания бригад
 
-# In[274]:
+# In[905]:
 
 tr = []
 with open('./input/jason-FullPlannerPlugin.log', encoding='utf-8') as f:
@@ -320,22 +426,42 @@ fw.close()
 
 # ### Формирование данных по весовым нормам
 
-# In[275]:
+# In[906]:
 
+import warnings
 def get_loco_tonnage(x):
     return '+loco_tonnage(series(%s),sections(%s),track(station(%s),station(%s)),max_train_weight(%s))'             % (x.series, x.sections, x.st_from, x.st_to, x.max_weight)
 
 loco_tonnage = pd.read_csv(FOLDER + 'loco_tonnage.csv', dtype={'st_from':str, 'st_to':str})
 add_info(loco_tonnage)
 loco_tonnage['ser_name'] = loco_tonnage.series.map(loco_series.set_index('ser_id').ser_name)
+loco_tonnage['link_name'] = list(zip(loco_tonnage.st_from_name, loco_tonnage.st_to_name))
 lt = loco_tonnage[(loco_tonnage.ser_name.apply(lambda x: any([i in str(x) for i in ['ВЛ80Р', 'ЭС5К']])))
-            & (loco_tonnage.st_from.isin(st.station)) & (loco_tonnage.st_to.isin(st.station))]
+            & (loco_tonnage.st_from.isin(test_stations.station)) & (loco_tonnage.st_to.isin(test_stations.station))]
+
+# Повышение нормы до 6000 для участков, где максимальная норма по всем сериям - меньше 4000
+a = lt.groupby('link_name').max_weight.max()
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore')
+    for link in a[a < 4000].index:
+        lt.loc[(lt.st_from_name == link[0]) & (lt.st_to_name == link[1]), 'max_weight'] = 6000
+        
 lt.apply(get_loco_tonnage, axis=1).to_csv(TEST_FOLDER + 'loco_tonnage.csv', index=False, sep=';')
+
+
+# In[907]:
+
+# Для проверки: можно посмотреть все весовые нормы на определенном участке (задается в первой строчке id станций) и серии.
+a = [int(float(i)) for i in d[int(2000036518), int(2000036868)].split(',')]
+for link in [(a[i], a[i+1]) for i in range(len(a)-1)]:
+    print(lt[(lt.st_from == str(link[0])) 
+             & (lt.st_to == str(link[1]))
+             & (lt.ser_name == 'ВЛ80Р')][['ser_name', 'sections', 'st_from_name', 'st_to_name', 'max_weight']])
 
 
 # ### Формирование данных по участкам обкатки бригад
 
-# In[276]:
+# In[908]:
 
 def get_region_borders(x):
     x_num = [i for i in x if i.isnumeric()]
@@ -357,12 +483,12 @@ def get_team_work_region(x):
 
 import networkx as nx
 g = nx.DiGraph()
-g.add_nodes_from(st.station.unique())
+g.add_nodes_from(test_stations.station.unique())
 g.add_weighted_edges_from(list(zip(l.st_from, l.st_to, l.time)))
 
 st_numbers = {0:'ЮРТЫ', 1:'ТАЙШЕТ', 2:'ВИХОРЕВКА', 3:'КОРШУНИХА-АНГАРСКАЯ', 4:'ЛЕНА', 5:'СЕВЕРОБАЙКАЛЬСК',
               6:'НОВЫЙ УОЯН', 7:'ТАКСИМО'}
-st_dict = st[['name', 'station']].set_index('name').to_dict()['station']
+st_dict = test_stations[['name', 'station']].set_index('name').to_dict()['station']
 df_team[['twr_id', 'team_reg_start', 'team_reg_end']] = df_team.region.apply(get_region_borders)
 tr = df_team[['twr_id', 'team_reg_start', 'team_reg_end']].drop_duplicates()
 tr['route'] = tr.apply(lambda row: nx.dijkstra_path(g, row.team_reg_start, row.team_reg_end), axis=1)
@@ -374,7 +500,7 @@ tr.apply(get_team_work_region, axis=1).to_csv(TEST_FOLDER + 'team_work_region.cs
 
 # ### Формирование данных по ниткам
 
-# In[277]:
+# In[909]:
 
 def change_slot_times(df):    
     min_dt = dt.datetime.fromtimestamp(slot.time_start.min())
@@ -397,13 +523,29 @@ slot_pass.drop_duplicates('slot').apply(lambda row: '+slot_pass(id(%s),category(
     .to_csv(TEST_FOLDER + 'slot_pass.csv', sep=';', index=False)
 
 
+# ###    Формирование данных по временам на смену локомотивов
+
+# In[958]:
+
+loco_change = ['ТАЙШЕТ', 'ЛЕНА', 'ТАКСИМО']
+lines = []
+for st in loco_change:
+    st_id = stations[stations.name == st].station.values[0]
+    next_sts = links[links.st_from == str(st_id)].st_to.unique()
+    for next_st_id in next_sts:
+        line = '+process(station(%s),track(station(%s),station(%s)),7200)' %                (st_id, st_id, next_st_id)
+        lines.append(line)
+        
+pd.DataFrame(lines).to_csv(TEST_FOLDER + 'process.csv', index=False, header=None)
+
+
 # ### Добавление заголовков и создание итогового файла
 
-# In[279]:
+# In[910]:
 
 import os
 files = [files for root, directories, files in os.walk('./test_scenario/') ][0]
-files = [f for f in files if ('.csv' in f) & ('paths_id.csv' != f)]
+files = [f for f in files if ('.csv' in f) & ('paths_id.csv' != f) & ('full_stations.csv' != f)]
 full = []
 for filename in sorted(files):
     with open('./test_scenario/' + filename, encoding='utf-8') as f:
@@ -417,7 +559,7 @@ ct = int(dt.datetime(2015, 7, 29, 18, 0, 0).timestamp())
 start_line = '+current_time(%s)\n+config("bulk_planning",0)\n' % ct
 end_line = '+current_id(%s,1)' % ct
 header = []
-head_st = list(st.drop_duplicates('station')               .apply(lambda row: '  %s = %s (%s)' % (row.station, row['name'], row.esr), axis=1).values)
+head_st = list(test_stations.drop_duplicates('station')               .apply(lambda row: '  %s = %s (%s)' % (row.station, row['name'], row.esr), axis=1).values)
 head_train = list(df.apply(lambda row: '  %s = %s; %s; {"АСОУП"=>[]}' 
          % (row.train_id, row.ind[:4]+'01'+row.ind[5:8]+row.ind[9:]+'01', int(row.number)), axis=1).values)
 head_loco = list(df_loco.apply(lambda row: '  %s = %s; {"АСОУП"=>""}' % (row.loco_id, int(row.number)), axis=1).values)
@@ -425,7 +567,9 @@ head_team = list(df_team.apply(lambda row: '  %s = %s; {}'
                                % (row.team_id, ''.join([x for x in row.number if x.isnumeric()])), axis=1).values)
 header = head_st + head_train + head_loco + head_team  
 
-with open('./test_scenario/test_scenario.log', 'w', encoding='utf-8') as fw_res:
+OUTPUT_FILENAME = 'jason-FullPlannerPlugin_model.log'
+
+with open('./test_scenario/' + OUTPUT_FILENAME, 'w', encoding='utf-8') as fw_res:
     for x in header:
         fw_res.write(x + '\n')
     fw_res.write(start_line)
@@ -434,5 +578,5 @@ with open('./test_scenario/test_scenario.log', 'w', encoding='utf-8') as fw_res:
     fw_res.write(end_line)    
 
 fw_res.close()
-print('Файл test_scenario.log создан')
+print('Файл %s создан' % OUTPUT_FILENAME)
 
