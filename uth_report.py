@@ -1,28 +1,61 @@
-﻿
+
 # coding: utf-8
 
-# In[1]:
+# # Построение отчета по использованию в планировании УТХ-бригад
+# 
+# ## Входные данные для отчета
+# 
+# Отчет строится на следующих данных:
+# 
+# 1. Лог планировщика (`jason-FullPlannerPlugin.log`). Перед построением отчета из лога планировщика скриптом `read.py` должны быть созданы соответствующие csv-файлы.
+# 2. Список УТХ-бригад. Он должен располагаться в подпапке `./resources/others/`, файл должен иметь название типа `Бригады_УТХ*.xls`. Если файлов с таким названием несколько, то скрипт выберет последний по дате изменения. Этот файл - это обычная выгрузка списка УТХ-бригад из АРМа Технолога (путь для выгрузки из АРМа Технолога: _(левая панель) Перевозочный процесс - Бригадная модель - Бригады УТХ - (выбрать нужные сутки) - кнопка "Запуск" - кнопка "Выгрузить в Excel"_).
+# 3. (Опционально) Отчет по отсевам по УТХ-бригадам. Это файл `otsev_uth_detail.csv`, он тоже должен располагаться в подпапке `./resources/others/`. Этот файл создается модулем отсевов (*(с) Варанкин*), на тестовых комплексах он располагается по пути `\server\bin\log\planner_filters\%папка с нужным запуском%\.`.
+# 
+# ## Варианты запуска скрипта
+# 
+# Скрипт можно запустить командой `python uth_report.py` из командной строки. По умолчанию будет построен отчет по станции Иркутск-Сортировочный, в отчет не будут добавлены последние операции с бригадами (на основании которых формировались входные данные для планировщика), сам отчет будет лежать в папке `report` в виде html-файла с названием `uth_report_%Date%_%Time%.html`, вместо %Date% и %Time% будут подставлены, соответственно, дата и время создания отчета.
+# 
+# Запуск можно модифицировать следующим образом:
+# 
+# 1. Запустить с ключом **`ops`: `python uth_report.py ops`**. В этом случае в отчет будут добавлены последние операции с бригадами из файла `./resources/others/otsev_uth_detail.csv` (см. п.3 в предыдущем разделе).
+# 2. Запустить с ключом **`noprint`: `python uth_report.py noprint`**. Это косметическая штука: в этом случае в консоль не будут выводиться некоторые отладочные сообщения. Но поскольку таких сообщений не очень много, то использование этого ключа не критично.
+# 3. Запустить с ключом **`zip`: `python uth_report.py zip`**. В этом случае после завершения построения отчета будет создан zip-файл.  Имя этого файла будет совпадать с названием файла с отчетом, а помимо собственно html-файла с отчетом в архив будет добавлен файл со стилями `skeleton.css`, который желателен для красивого отображения отчета в браузере.
+#   1. Обычный запуск этого отчета, который я чаще всего делал, выглядел как `python uth_report.py ops noprint zip`. В этом случае применятся все три опции.
+# 4. (Экспериментальная функция) Запустить с ключом вида **`"depot(%TCH%,%ST_NAME%)"`** (кавычки обязательны!), вместо %TCH% надо указать код ТЧЭ бригады (например, "ТЧЭ-1 В-СИБ" или "ТЧЭ-13 ДВОСТ" - коды можно посмотреть в файле `Бригады_УТХ*.xls` в столбце "Депо приписки"), вместо %ST_NAME% надо указать точное название станции (например, ТАЙШЕТ или ИРКУТСК-СОРТИРОВОЧНЫЙ, можно не капсом). В этом случае отчет будет строиться не для бригад депо ИРКУТСК-СОРТИРОВОЧНЫЙ, а для бригад депо %TCH%, отправляющихся со станции %ST_NAME%. 
+#   1. Пример запуска с этим ключом: `python uth_report.py "depot(ТЧЭ-1 В-СИБ,ТАЙШЕТ)"`.
+#   2. Можно запускать с несколькими ключами:  `python uth_report.py ops noprint zip "depot(ТЧЭ-1 В-СИБ,ТАЙШЕТ)"`
+#   3. Запуск по умолчанию аналогичен запуску командой `python uth_report.py "depot(ТЧЭ-5 В-СИБ,ИРКУТСК-СОРТИРОВОЧНЫЙ)"`
+#   
+# Для удобства создан батник (лежит рядом) `uth_report.bat`, он сначала создает csv-файлы из лога планировщика, а затем формирует самый востребованный отчет (по Иркутску, без операций). Соответственно, для получения отчета надо разархивировать `jason-FullPlannerPlugin.log` в папку `input` и запустить батник. Разумеется, его можно модифицировать по своему усмотрению.
+#   
+# ## Известные подводные камни
+# 
+# 1. Кодировка файла `otsev_uth_detail.csv`. Сейчас это кодировка ANSI. При чтении файла нужная кодировка задается параметром `encoding`, сейчас нужная строчка скрипта выглядит так: `df_ops = pd.read_csv('input/' + ops_filename, sep=';', encoding='mbcs', dtype={'team_id':str})`. Надо на всякий случай следить за возможными падениями из-за смены кодировки. Именования кодировок в питоне можно посмотреть [здесь](https://docs.python.org/3/library/codecs.html#standard-encodings).
+# 2. Для корректной работы скрипта нужный файл `Бригады_УТХ*.xls` **НЕ ДОЛЖЕН** быть открыт (в экселе). Иначе определение нужного (последнего) файла по маске имени сработает неправильно.
+
+# In[186]:
 
 import numpy as np
 import pandas as pd
 import time, datetime
-from ast import literal_eval
-import matplotlib.pyplot as plt
-import seaborn as sns
 import zipfile
+from ast import literal_eval
 
 
-# In[2]:
+# In[168]:
 
 report = ''
 FOLDER = 'resources/'
 REPORT_FOLDER = 'report/'
 
 
-# In[3]:
+# In[169]:
+
+# Парсинг ключей запуска
 
 import sys
-JOIN_OPS, ZIP, PRINT = False, False, True
+JOIN_OPS, ZIP, PRINT, TCH, ST_NAME = False, False, True, 'ТЧЭ-5 В-СИБ', 'ИРКУТСК-СОРТИРОВОЧНЫЙ'
+argv = sys.argv
 if len(sys.argv) > 1:
     if 'ops' in sys.argv:
         JOIN_OPS = True
@@ -30,16 +63,24 @@ if len(sys.argv) > 1:
         ZIP = True 
     if 'noprint' in sys.argv:
         PRINT = False
+    if any(['depot' in arg for arg in sys.argv]):
+        st = [arg for arg in argv if 'depot' in arg][0]        
+        dep = st[6:-1]
+        TCH, ST_NAME = [term.strip().upper() for term in dep.split(',')]
 
 
-# In[4]:
+# In[170]:
 
 time_format = '%b %d, %H:%M'
 def nice_time(x):
     return time.strftime(time_format, time.localtime(x))
 
 
-# In[5]:
+# ## Функции для создания html-файла
+# 
+# Весь отчет записывается в глобальную переменную `report` в html-разметке, для добавления строк используются методы `add_header` и `add_line`.
+
+# In[171]:
 
 def add_line(line, p=PRINT):    
     global report        
@@ -99,7 +140,9 @@ def create_zip(filename):
         zf.close()    
 
 
-# In[6]:
+# ## Загрузка результатов планирования из csv-файлов
+
+# In[172]:
 
 pd.set_option('max_rows', 50)
 
@@ -120,7 +163,7 @@ team_info.regions = team_info.regions.apply(literal_eval)
 st_names = stations[['station', 'name', 'esr']].drop_duplicates().set_index('station')
 
 
-# In[7]:
+# In[173]:
 
 # Мержим таблицы _plan и _info для поездов, локомотивов и бригад
 # Добавляем во все таблицы названия станций на маршруте и времена отправления/прибытия в читабельном формате
@@ -158,7 +201,7 @@ team_plan['loco_time'] = list(zip(team_plan.loco, team_plan.time_start))
 loco_plan['team'] = loco_plan.loco_time.map(team_plan.drop_duplicates('loco_time').set_index('loco_time').team)
 
 
-# In[8]:
+# In[174]:
 
 print('''--------
 Возможные ключи: 
@@ -168,12 +211,19 @@ zip - архивирует отчет
 --------''')
 
 
-# In[9]:
+# ## Чтение списка УТХ-бригад
+
+# ### Поиск нужного файла
+
+# In[175]:
 
 import os
-import time
 files = [files for root, directories, files in os.walk('./resources/others')][0]
 times = {}
+
+# Тут сделано немного через жопу: сначала происходит os.chdir на нужную папку, а затем два раза возвращаемся обратно через
+# os.chdir('..'). Наверняка это можно сделать более правильно.
+
 os.chdir('./resources/others')
 try:
     for f in files:
@@ -194,17 +244,16 @@ except:
     os.chdir('..')
 
 
-# In[10]:
+# ### Загрузка бригад из файла в датафрейм
 
-# Загрузка УТХ-бригад из экселевской выгрузки
+# In[176]:
+
 import xlrd
 uth = pd.read_excel('./resources/others/' + uth_filename)
 uth.columns = ['Номер', 'Машинист', 'Депо', 'Вид движения', 'Факт.явка', 'План.явка']
 uth['Вид движения'] = uth['Вид движения'].apply(lambda x: str(x).replace('\n\t\t\t', ';'))
-uth['irk'] = uth['Депо'].apply(lambda x: 'ТЧЭ-5 В' in x)
+uth['irk'] = uth['Депо'].apply(lambda x: TCH in x)
 uth = uth[uth.irk]
-#time_f = '%Y-%m-%d %H:%M:%S'
-##uth['uth_presence'] = uth['План.явка'].apply(lambda x: time.mktime(datetime.datetime.strptime(x, '%H:%M %d.%m.%y').timetuple()))
 if (uth['План.явка'].dtype == float):
     uth['План.явка'] = uth['План.явка'].apply(lambda x: datetime.datetime(*xlrd.xldate.xldate_as_tuple(x, 0)))
     print('Формат времени в столбце "Плановая явка" заменен c формата Excel на python datetime')
@@ -219,17 +268,19 @@ except:
 uth.head()
 
 
-# In[11]:
+# ## Чтение и обработка результатов планирования, выделение УТХ-бригад
+
+# In[177]:
 
 info_cols = ['number', 'name', 'loc_name', 'state', 'depot_time_norm', 'is_planned']
 team_info['name'] = team_info.number.map(uth.set_index('Номер')['Машинист'])
 team_info['uth_presence'] = team_info.number.map(uth.set_index('Номер').uth_presence)
-team_info['depot_time_norm'] = team_info.depot_time.apply(lambda x: time.strftime(time_format, time.localtime(x)) if x !=-1 else x)
+team_info['depot_time_norm'] = team_info.depot_time.apply(lambda x: nice_time(x) if x !=-1 else x)
 planned = team_plan[team_plan.state.isin([0, 1])].drop_duplicates('team')
 team_info['is_planned'] = team_info.team.isin(planned.team)
 
 
-# In[12]:
+# In[178]:
 
 df_input_show = team_info[team_info.number.isin(uth['Номер'])][info_cols]
 df_input_show.is_planned.replace(False, 'Нет', inplace=True)
@@ -239,7 +290,7 @@ cols = ['Номер', 'Машинист', 'Депо', 'Вид движения',
 df_show = uth[cols].set_index(['Номер', 'Машинист']).join(df_input_show.set_index(['Номер', 'Машинист'])).fillna('-').reset_index()
 
 
-# In[13]:
+# In[179]:
 
 team_cols = ['number', 'name', 'st_from_name', 'st_to_name', 'time_start', 'time_start_norm', 
              'state', 'loco_number', 'train_number', 'all_states']
@@ -258,10 +309,10 @@ df_output_show.columns = ['Номер', 'Машинист', 'Ст.отпр.', '�
                           'Состояние', 'Номер ЛОК', 'Номер П', 'Все состояния']
 
 
-# In[14]:
+# In[180]:
 
 add_line('Время сбора данных и запуска планировщика: %s' % time.strftime(time_format, time.localtime(current_time)))
-add_header('Всего %d иркутских бригад загружено в ОУЭР из УТХ' % uth['Номер'].count())
+add_header('Всего %d бригад депо %s загружено в ОУЭР из УТХ' % (uth['Номер'].count(), ST_NAME))
 add_line('Из них:')
 add_line('- передано в планировщик: %d' % team_info[team_info.number.isin(uth['Номер'])].team.count())
 add_line('- не передано в планировщик: %d' % uth[uth['Номер'].isin(team_info.number) == False]['Номер'].count())
@@ -269,7 +320,62 @@ add_line('- запланировано: %d' % df_output_show['Номер'].count
 df_show_uth_plan = df_show.set_index(['Номер', 'Машинист']).join(df_output_show.set_index(['Номер', 'Машинист'])).fillna('-')
 
 
-# In[15]:
+# ## Чтение данных о последних операциях
+
+# In[191]:
+
+files = [files for root, directories, files in os.walk('./resources/others')][0]
+ops_filename = 'otsev_uth_detail.csv'
+if ops_filename in files:
+    df_ops = pd.read_csv('input/' + ops_filename, sep=';', encoding='mbcs', dtype={'team_id':str})    
+    if 'Номер' not in df_show_uth_plan.columns:
+        df_show_uth_plan = df_show_uth_plan.reset_index()    
+    df_show_uth_plan['team'] = df_show_uth_plan['Номер'].map(team_info.drop_duplicates('number').set_index('number').team)
+    df_show_uth_plan['oper_id'] = df_show_uth_plan.team.map(df_ops.drop_duplicates('team_id')
+                                                            .set_index('team_id').team_type_asoup_id)
+    df_show_uth_plan['oper_name'] = df_show_uth_plan.team.map(df_ops.drop_duplicates('team_id')
+                                                              .set_index('team_id').team_type_name)
+    df_show_uth_plan['Посл.операция'] = df_show_uth_plan.apply(lambda row: '(%s) %s' 
+                                                               % (row.oper_id, row.oper_name), axis=1)
+    df_show_uth_plan['Время посл.оп.'] = df_show_uth_plan.team.map(df_ops.drop_duplicates('team_id')
+                                                                   .set_index('team_id').team_time)    
+    df_show_uth_plan['Место посл.оп.'] = df_show_uth_plan.team.map(df_ops.drop_duplicates('team_id')
+                                                                   .set_index('team_id').team_location_name)    
+
+
+# ## Формирование результирующей таблицы
+
+# In[182]:
+
+if JOIN_OPS:    
+    show_cols = ['Номер', 'Машинист', 'Депо', 'Вид движения',  
+             'Посл.операция', 'Время посл.оп.', 'Место посл.оп.',
+             'План.явка', 'Исх.местоположение', 'Исх.состояние', 'Время явки', 'В плане?', 'Ст.отпр.', 'Ст.направл.', 
+             'Время отпр.', 'Состояние', 'Номер ЛОК', 'Номер П', 'Все состояния']
+else:
+    show_cols = ['Номер', 'Машинист', 'Депо', 'Вид движения',              
+             'План.явка', 'Исх.местоположение', 'Исх.состояние', 'Время явки', 'В плане?', 'Ст.отпр.', 'Ст.направл.', 
+             'Время отпр.', 'Состояние', 'Номер ЛОК', 'Номер П', 'Все состояния']
+
+res_to_index_start_with_0 = df_show_uth_plan.sort_values(['uth_presence']).reset_index()[show_cols].reset_index()
+
+# Два reset_index() в предыдущей строке и следующая строчка нужны только для того, чтобы в таблице появилась нумерация строк с 1
+res_to_index_start_with_0['index'] = res_to_index_start_with_0['index'] + 1
+
+add_line(res_to_index_start_with_0, p=False)
+
+
+# In[183]:
+
+not_input = res_to_index_start_with_0[res_to_index_start_with_0['В плане?'] == '-']
+not_planned = res_to_index_start_with_0[res_to_index_start_with_0['В плане?'] == 'Нет']
+add_header('Не переданные бригады:')
+add_line(list(not_input['Номер'].unique()))
+add_header('Не запланированные бригады:')
+add_line(list(not_planned['Номер'].unique()))
+
+
+# In[184]:
 
 def add_state_legend():
     add_line('Состояния бригад:')
@@ -285,174 +391,11 @@ def add_state_legend():
     add_line('9 - сдача локомотива')
 
 
-# In[16]:
-
-files = [files for root, directories, files in os.walk('./resources/others')][0]
-times = {}
-os.chdir('./resources/others')
-try:
-    for f in files:
-        if ('Операции' in f) & ('.txt' in f):
-            times[f] = int(os.path.getmtime(f))
-
-    if times != {}:
-        ops_filename = max(times, key=lambda k: times[k])
-        date_modified = times[ops_filename]
-    else:
-        ops_filename = 'Операции с УТХшными ЛБ.txt'
-        date_modified = 0
-    os.chdir('..')
-    os.chdir('..')
-except:
-    os.chdir('..')
-    os.chdir('..')
-print('Данные об операциях с УТХ-бригадами взяты из файла "%s" (дата изменения %s)' % (ops_filename, nice_time(date_modified)))
-
-
-# In[17]:
-
-lines = []
-cur_team_id = 0
-cur_team_name = ''
-with open ('./resources/others/' + ops_filename, encoding='utf-8-sig') as fop:
-    for line in fop:        
-        if line[:7] == 'Бригада':            
-            sp = line[:-1].split()            
-            cur_team_id = sp[2][:-1]
-            cur_team_name = sp[1][:-1]
-        if line[:4] == '2016':
-            sp = line[:-1].split('\t')
-            l = [cur_team_id, cur_team_name] + sp
-            lines.append(l)
-        
-lines[:10]
-cols = ['team', 'name', 'team_type', 'op_id', 'op_name', 'op_time', 'op_location']
-df_ops = pd.DataFrame(lines, columns = ['team', 'name', 'op_time', 'op_id', 'team_type', 'op_name', 'op_location'])
-df_ops = df_ops[cols]
-df_ops.sample(3)
-
-
-# In[18]:
-
-print('Всего бригад в файле %s: %d' % (ops_filename, df_ops.team.drop_duplicates().count()))
-print('Время сбора данных: %s' % time.strftime(time_format, time.localtime(current_time)))
-
-
-# In[19]:
-
-df_ops['timestamp'] = df_ops['op_time'].apply(lambda x:                                               time.mktime(datetime.datetime.strptime(x[:-6], "%Y-%m-%d %H:%M:%S").timetuple()))
-print('Время последней операции в файле %s: %s' 
-      % (ops_filename, time.strftime(time_format, time.localtime(df_ops.timestamp.max()))))
-
-
-# In[20]:
-
-mask = df_ops.timestamp <= current_time
-cols = ['team', 'name', 'team_type', 'op_id', 'op_name', 'op_time', 'op_location']
-last = df_ops[mask].groupby('team').timestamp.max().to_frame().reset_index().set_index(['team', 'timestamp'])            .join(df_ops.set_index(['team', 'timestamp'])).reset_index()
-last[cols].sample(3)
-
-
-# In[21]:
-
-good = df_show[df_show['В плане?'] == 'Да']['Машинист'].unique()
-last_good = last[last.name.isin(good) == False].sort_values(['op_name', 'timestamp']).reset_index()
-last_good[cols].head()
-
-
-# In[22]:
-
-last.columns = ['Id', 'Timestamp', 'Машинист', 'Тип бр.', 
-                       'Id посл.оп.', 'Посл.операция', 'Время посл.оп.', 'Место посл.оп.']
-op_cols = ['Id', 'Машинист', 'Тип бр.', 'Id посл.оп.', 'Посл.операция', 'Время посл.оп.', 'Место посл.оп.']
-if JOIN_OPS:    
-    show_cols = ['Номер', 'Машинист', 'Депо', 'Вид движения', 'Тип бр.', 
-             'Id посл.оп.', 'Посл.операция', 'Время посл.оп.', 'Место посл.оп.',
-             'План.явка', 'Исх.местоположение', 'Исх.состояние', 'Время явки', 'В плане?', 'Ст.отпр.', 'Ст.направл.', 
-             'Время отпр.', 'Состояние', 'Номер ЛОК', 'Номер П', 'Все состояния']
-    res = df_show_uth_plan.reset_index().set_index('Машинист').join(last[op_cols].set_index('Машинист'))
-else:
-    show_cols = ['Номер', 'Машинист', 'Депо', 'Вид движения',              
-             'План.явка', 'Исх.местоположение', 'Исх.состояние', 'Время явки', 'В плане?', 'Ст.отпр.', 'Ст.направл.', 
-             'Время отпр.', 'Состояние', 'Номер ЛОК', 'Номер П', 'Все состояния']
-    res = df_show_uth_plan
-res_to_index_start_with_0 = res.reset_index().sort_values(['uth_presence', 'Машинист'])[show_cols].reset_index()
-res_to_index_start_with_0['index'] = res_to_index_start_with_0['index'] + 1
-add_line(res_to_index_start_with_0, p=False)
-
-
-# In[23]:
-
-not_input = res_to_index_start_with_0[res_to_index_start_with_0['В плане?'] == '-']
-not_planned = res_to_index_start_with_0[res_to_index_start_with_0['В плане?'] == 'Нет']
-add_header('Не переданные бригады:')
-add_line(list(not_input['Номер'].unique()))
-add_header('Не запланированные бригады:')
-add_line(list(not_planned['Номер'].unique()))
-
-
-# In[24]:
+# In[185]:
 
 add_state_legend()
 filename = REPORT_FOLDER + 'uth_report_' + time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time())) + '.html'
 create_report(filename)
 if ZIP:
     create_zip(filename)
-
-
-# In[25]:
-
-res_to_index_start_with_0[res_to_index_start_with_0['В плане?'] == 'Нет']['Номер'].unique()
-
-
-# In[26]:
-
-print(nice_time(current_time))
-arr = [9205000078, 9205007670, 9205002505, 9205008457, 9205006890, 9205003873, 9205008378, 9205008860, 9205031292, 
-       9205002635, 9205004359, 9205007885, 9205007272, 9205002097, 9205004564, 9205031361, 9205007941, 9205007540]
-cols = ['number', 'depot', 'ready_type', 'state', 'loc_name', 'oper_time_f', 'loco', 'ttype']
-team_info['oper_time_f'] = team_info.oper_time.apply(nice_time)
-team_info[team_info.number.isin(arr)][cols].sort_values('state')
-
-
-# In[27]:
-
-st_name = 'ИРКУТСК-СОРТИРОВОЧНЫЙ'
-cols = ['team', 'st_from_name', 'st_to_name', 'depot_name', 'time_start_norm', 'state', 'loco', 'is_uth']
-team_plan['depot_name'] = team_plan.depot.map(st_names.name)
-team_plan['team_type'] = team_plan.team.apply(lambda x: int(str(x)[0]))
-team_plan['is_uth'] = team_plan.number.isin(uth['Номер'])
-a = team_plan[(team_plan.st_from_name == st_name)
-         & (team_plan.time_start >= current_time) & (team_plan.time_end < current_time + 24 * 3600)
-         & (team_plan.state.isin([0, 1]))]
-b = a[(a.depot_name == st_name) & (a.is_uth == False)][cols]
-
-
-# In[28]:
-
-cols = ['team', 'number', 'depot', 'ready_type', 'state', 'loc_name', 'oper_time_f', 'loco', 'ttype']
-q = team_info[team_info.team.isin(b.team)][cols].sort_values('team')
-print(q.head().to_string(index=False))
-filt = pd.read_csv('./input/otsev_detail.csv', sep=';',
-                  dtype={'team_id':str, 'train_id':str, 'loco_id':str})
-filt_cols = ['team_id', 'team_type_asoup_id', 'team_type_name', 'team_time']
-print(filt[(filt.team_id.isin(q.team)) & (filt.team_type_asoup_id == 31)][filt_cols].sort_values('team_id').head().to_string(index=False))
-#filt.columns
-
-
-# In[49]:
-
-# Создание входных данных с проставленным признаком uth() в сообщении +team_attributes.
-
-# def get_team_attr(x):
-#     regions = ','.join([('id(%s)' % reg) for reg in x.regions])
-#     series = ','.join([('id(%s)' % ser) for ser in literal_eval(x.series)])
-#     s = '+team_attributes(id(%s),attributes([team_work_regions([%s]),depot(station(%s)),loco_series([%s]),long_train(%s),heavy_train(%s),fake(%s),type(%s),uth(%s)]))' \
-#          % (x.team, regions, x.depot, series, x.long, x.heavy, x.fake, x.ttype, int(x.uth))
-#     return s
-
-# uth = pd.read_excel('./resources/others/' + uth_filename)
-# team_info['uth'] = team_info.number.isin(uth['Табельный номер'])
-# team_info['depot_name'] = team_info.depot.map(st_names.name)
-# team_info.apply(lambda row: get_team_attr(row), axis=1).to_csv('team_attr_uth.txt', index=False, sep=';')
 
