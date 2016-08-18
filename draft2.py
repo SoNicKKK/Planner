@@ -1,4 +1,4 @@
-﻿
+
 # coding: utf-8
 
 # In[142]:
@@ -10,7 +10,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
-#get_ipython().magic('matplotlib inline')
+get_ipython().magic('matplotlib inline')
 sns.set(style='whitegrid', context='notebook')
 sns.set_color_codes('dark')
 
@@ -184,8 +184,8 @@ plt.legend()
 
 # In[5]:
 
-#get_ipython().magic('run read.py')
-#get_ipython().magic('run common.py')
+get_ipython().magic('run read.py')
+get_ipython().magic('run common.py')
 
 
 # In[15]:
@@ -314,7 +314,7 @@ print(sum(util0[assign[assign_ind]]))
 
 # In[438]:
 
-#get_ipython().magic('run common.py')
+get_ipython().magic('run common.py')
 
 
 # In[565]:
@@ -437,7 +437,85 @@ plt.scatter(df_loco.ts_norm, [0.0] * len(df_loco.ts_norm), s=50, c='r')
 plt.scatter(df_team.ts_norm, [1.0] * len(df_team.ts_norm), s=50, c='b')
 
 
-# In[ ]:
+# In[50]:
+
+get_ipython().magic('run common.py')
 
 
+# In[57]:
+
+num = '4768'
+cols = ['team', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm', 'state', 'loco']
+team_plan[team_plan.number.apply(lambda x: num in str(x))][cols]
+
+
+# In[47]:
+
+#st_name = 'ИРКУТСК-СОРТИРОВОЧНЫЙ'
+#st_name = 'ЗИМА'
+st_name = 'ТАЙШЕТ'
+team_plan['fake_depot'] = team_plan.team.map(team_plan[team_plan.state.isin([0, 1])].drop_duplicates('team').set_index('team').st_from_name)
+team_plan['depot_name'] = team_plan.depot.map(st_names.name)
+team_plan.depot_name.fillna(team_plan.fake_depot, inplace=True)
+date = datetime.datetime.fromtimestamp(current_time)
+y, m, d = date.year, date.month, date.day
+day_start = int(datetime.datetime(y, m, d, 18, 0, 0).timestamp())
+
+
+irk = team_plan[(team_plan.time_start >= day_start) & (team_plan.time_start < day_start + 24 * 3600)
+         & (team_plan.depot_name == st_name) & (team_plan.st_from_name == st_name)
+         & (team_plan.state.isin([0, 1]))]
+
+
+# In[49]:
+
+print(irk.st_to_name.value_counts())
+print(irk.st_to_name.value_counts().sum())
+
+
+# In[43]:
+
+cols = ['team', 'st_from_name', 'st_to_name', 'time_start_norm', 'state', 'depot_name', 'loco']
+print(nice_time(current_time))
+print(irk.sort_values('time_start')[cols].head().to_string(index=False))
+team_plan[team_plan.team == '200200136435'][cols]
+
+
+# In[33]:
+
+loco_plan[loco_plan.loco == '200200249699  '][['loco', 'st_from_name', 'st_to_name', 'time_start_norm', 'train']]
+
+
+# In[44]:
+
+get_ipython().magic('run common.py')
+
+
+# In[45]:
+
+prev_team = pd.read_csv(FOLDER + 'prev_team.csv', dtype={'team':str})
+prev_team['ptf'] = prev_team.prev_ready_time.apply(nice_time)
+team_plan['ptf'] = team_plan.team.map(prev_team.set_index('team').ptf)
+
+
+# In[49]:
+
+team_plan['depot_name'] = team_plan.depot.map(st_names.name)
+team_info['depot_name'] = team_info.depot.map(st_names.name)
+print(team_plan[(team_plan.uth == 0) & (team_plan.depot_name == 'ИРКУТСК-СОРТИРОВОЧНЫЙ')
+         & (team_plan.state.isin([0, 1])) 
+         & (team_plan.st_from_name == 'ИРКУТСК-СОРТИРОВОЧНЫЙ')
+         & (team_plan.state_info == '3')
+         & (team_plan.time_start < current_time + 24 * 3600)].sort_values('time_start')[['team', 'time_start', 'time_start_norm', 'ptf', 'state_info', 'loc_name']].to_string(index=False))
+
+
+# In[47]:
+
+nice_time(current_time)
+team_info[(team_info.uth == 1) & (team_info.depot_name == 'ИРКУТСК-СОРТИРОВОЧНЫЙ')].depot_time.max()
+
+
+# In[48]:
+
+team_info[team_info.team == '200200131005'].loc_name
 
