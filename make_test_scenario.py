@@ -1,4 +1,4 @@
-﻿
+
 # coding: utf-8
 
 # ## Создание файла с модельными входными данными
@@ -40,8 +40,16 @@
 # 6. Участки обкатки бригад (`team_work_region`) формируются скриптом. Из данных Войтенко берутся границы участков обкатки для каждой бригады, ищутся все участки планирования между этими границами. Формируются строки team_work_region с нужными id и набором треков.
 # 7. Участки обслуживания бригад (`team_region`) полностью копируются из реальных данных.
 # 8. Данные по каждой сущности записываются в отдельные csv-файлы, затем они собираются вместе в один выходной файл `jason-FullPlannerPlugin_model.log`.
+# 
+# ### Как запускать
+# 
+# В принципе, все должно работать "из коробки", достаточно только убедиться, что нужные файлы лежат по нужным путям. Далее надо запустить последовательно два батника:
+# * **`create_scenario_data.bat`** - подчистит все скрипты с помощью `release.bat`, запустит `read.py`, чтобы создать актуальные csv-файлы, затем запустит данный скрипт для создания имитационного файла и скопирует его в папку `./jar`.
+# * **`run_scenario_trace.bat`** - запустит планировщик из папки `/jar` (в ней, разумеется, должен лежать актуальный файл `JADEPlanner.jar`) с максимальным уровнем логирования (TRACE), затем создаст файл `log_for_analysis.log` (в нем будут входные данные из `jason-FullPlannerPlugin.log` и только что полученные результаты планирования), скопирует его в папку `./input` и запустит скрипт `read.py log_for`, чтобы создать csv уже с новыми данными.
+# 
+# После этого полученный расчет можно анализировать обычными тестовыми скриптами.
 
-# In[886]:
+# In[6]:
 
 FOLDER = 'resources/'
 
@@ -91,7 +99,7 @@ def nice_print(s, **kwargs):
         print(s[cols].to_string(index=False))
 
 
-# In[887]:
+# In[7]:
 
 TEST_FOLDER = './test_scenario/'
 input_filename = './input/(Новые) 2.11.xlsx'
@@ -102,7 +110,7 @@ st_names = stations.drop_duplicates('station').set_index('station')
 
 # ### Формирование данных по поездам
 
-# In[888]:
+# In[8]:
 
 df = pd.read_excel(input_filename, header=1)
 df.dropna(subset=['Номер поезда'], inplace=True)
@@ -119,7 +127,7 @@ df['st_to'] = df.st_to.map(stations.drop_duplicates('esr').set_index('esr').stat
 df.head()
 
 
-# In[889]:
+# In[9]:
 
 # Датафрейм с путями преобразуем в словарь. Это не обязательно, просто так чуть проще обращаться к нему для поиска.
 # Можно ограничиться просто set_index на датафрейм.
@@ -129,7 +137,7 @@ d = paths.set_index(['ST_FROM', 'ST_TO'])[['ROUTE']].to_dict()['ROUTE']
 [int(float(i)) for i in d[2000036538, 2000036518].split(',')]
 
 
-# In[890]:
+# In[10]:
 
 def get_train_info(x, paths):    
     st_from = int(x['oper_st'])
@@ -146,7 +154,7 @@ a = df.apply(lambda x: get_train_info(x, paths), axis=1)
 a.to_csv(TEST_FOLDER + 'train_info.csv', index=False, sep=';')
 
 
-# In[891]:
+# In[11]:
 
 import datetime as dt
 def get_oper(x):
@@ -168,7 +176,7 @@ a.to_csv(TEST_FOLDER + 'train_oper.csv', index=False, sep=';')
 
 # ### Формирование данных по локомотивам
 
-# In[892]:
+# In[12]:
 
 df_loco = pd.read_excel(input_filename, header=1, sheetname='ЛОК')
 df_loco.dropna(subset=['Борт НОМЕР'], inplace=True)
@@ -185,7 +193,7 @@ df_loco['st_to'] = df_loco.st_to.map(stations.drop_duplicates('esr').set_index('
 df_loco.head()
 
 
-# In[893]:
+# In[13]:
 
 def get_loco_info(x):
     ser_id = loco_series[loco_series.ser_name == x.ser_name].ser_id.values[0]
@@ -196,7 +204,7 @@ a = df_loco.apply(lambda x: get_loco_info(x), axis=1)
 a.to_csv(TEST_FOLDER + 'loco_attr.csv', index=False, sep=';')
 
 
-# In[894]:
+# In[14]:
 
 def get_loco_location(x):
     ts = int(round(x.oper_time.timestamp()))
@@ -215,7 +223,7 @@ a = df_loco.apply(lambda x: get_loco_location(x), axis=1)
 a.to_csv(TEST_FOLDER + 'loco_location.csv', index=False, sep=';')    
 
 
-# In[895]:
+# In[15]:
 
 def get_loco_service(x):
     ts = int(round(x.oper_time.timestamp()))
@@ -227,7 +235,7 @@ a.to_csv(TEST_FOLDER + 'loco_service.csv', index=False, sep=';')
 
 # ### Формирование данных по бригадам
 
-# In[896]:
+# In[16]:
 
 '''
 В таблице Войтенко приведены коды депо приписок бригад. Депо, в общем случае, отличается от станций планирования, используемых
@@ -238,7 +246,7 @@ a.to_csv(TEST_FOLDER + 'loco_service.csv', index=False, sep=';')
 depot_st_dict = {318803:89370, 319212:90320, 359276:90440, 319201:92000, 319209:92440, 319210:92710, 359271:92570}
 
 
-# In[929]:
+# In[17]:
 
 df_team = pd.read_excel(input_filename, header=1, sheetname='ЛБР')
 df_team.dropna(subset=['Таб.номер'], inplace=True)
@@ -270,12 +278,12 @@ df_team.loco_id.replace(0, -1, inplace=True)
 df_team.head()
 
 
-# In[949]:
+# In[19]:
 
 df_team[df_team.team_id == 8800019].oper_time.apply(lambda x: int(round(x.timestamp())))
 
 
-# In[898]:
+# In[20]:
 
 def get_team_info(x):
     ser_list = x.ser_name.split('; ')
@@ -291,7 +299,7 @@ a = df_team.apply(lambda x: get_team_info(x), axis=1)
 a.to_csv(TEST_FOLDER + 'team_attr.csv', index=False, sep=';')
 
 
-# In[945]:
+# In[21]:
 
 def get_team_ready(x):
     try:
@@ -307,13 +315,13 @@ def get_team_ready(x):
         last_ready = 'return'
     else:
         last_ready = 'depot' if depot_ts >= return_ts else 'return'    
-    return '+fact_team_ready(id(%s),ready_depot(time(%s),station(%s)),ready_return(time(%s),station(%s)),last_ready(%s),rest_start_time(%s))' %    (x.team_id, x.depot_ready_st, depot_ts, x.return_ready_st, return_ts, last_ready, rest_start_ts)
+    return '+fact_team_ready(id(%s),ready_depot(time(%s),station(%s)),ready_return(time(%s),station(%s)),last_ready(%s),rest_start_time(%s))' %    (x.team_id, depot_ts, x.depot_ready_st, return_ts, x.return_ready_st, last_ready, rest_start_ts)
         
 a = df_team.apply(lambda x: get_team_ready(x), axis=1)
 a.to_csv(TEST_FOLDER + 'team_ready.csv', index=False, sep=';')
 
 
-# In[900]:
+# In[44]:
 
 # Словарь, в котором ключами являются состояния бригад (0...9), а значениями - коды последних операций с бригадами, которые
 # соответствуют этому состоянию. Подробнее можно посмотреть в документе "Алгортим планирования", раздел 4.3.2.
@@ -321,7 +329,7 @@ a.to_csv(TEST_FOLDER + 'team_ready.csv', index=False, sep=';')
 states = {0:[33], 1:[2, 3], 2:[28, 30], 3:[31, 54], 4:[37], 5:[24, 26, 43], 6:[1, 42], 7:[34], 8:[35, 38], 9:[25, 41]}
 
 
-# In[951]:
+# In[45]:
 
 def get_team_location(x):
     oper_time_ts = int(round(x.oper_time.timestamp()))    
@@ -344,7 +352,7 @@ a.to_csv(TEST_FOLDER + 'team_location.csv', index=False, sep=';')
 
 # ### Формирование данных по станциям
 
-# In[902]:
+# In[46]:
 
 def get_station(x):
     s = '+station(id(%s),loco_region(%s),service([]),norm_reserve([norm(weight_type(0),0),norm(weight_type(1),0)]),norm_time(%s))' %        (x.station, x.loco_region, x.norm_time)
@@ -357,7 +365,7 @@ a.to_csv(TEST_FOLDER + 'station.csv', index=False, sep=';')
 
 # ### Формирование данных по участкам планирования
 
-# In[903]:
+# In[47]:
 
 def get_links(x):
     return '+link(track(station(%s),station(%s)),attributes([duration(%s),distance(%s),push(0),direction(%s),lines(%s),road(%s)]))'         % (x.st_from, x.st_to, x.time, x.dist, x['dir'], x.lines, x.road)
@@ -369,7 +377,7 @@ l.apply(get_links, axis=1).to_csv(TEST_FOLDER + 'link.csv', index=False, sep=';'
 
 # ### Формирование данных по пунктам ТО
 
-# In[904]:
+# In[48]:
 
 '''
 На реальном полигоне пункты ТО есть на всех крупных станциях модельного полигона, кроме станции Новый Уоян. Чтобы усложнить 
@@ -408,7 +416,7 @@ pd.DataFrame(lines).to_csv(TEST_FOLDER + 'service_station.csv', index=False, sep
 
 # ### Формирование данных по участкам обслуживания бригад
 
-# In[905]:
+# In[49]:
 
 tr = []
 with open('./input/jason-FullPlannerPlugin.log', encoding='utf-8') as f:
@@ -426,7 +434,7 @@ fw.close()
 
 # ### Формирование данных по весовым нормам
 
-# In[906]:
+# In[50]:
 
 import warnings
 def get_loco_tonnage(x):
@@ -449,7 +457,7 @@ with warnings.catch_warnings():
 lt.apply(get_loco_tonnage, axis=1).to_csv(TEST_FOLDER + 'loco_tonnage.csv', index=False, sep=';')
 
 
-# In[907]:
+# In[51]:
 
 # Для проверки: можно посмотреть все весовые нормы на определенном участке (задается в первой строчке id станций) и серии.
 a = [int(float(i)) for i in d[int(2000036518), int(2000036868)].split(',')]
@@ -461,7 +469,7 @@ for link in [(a[i], a[i+1]) for i in range(len(a)-1)]:
 
 # ### Формирование данных по участкам обкатки бригад
 
-# In[908]:
+# In[52]:
 
 def get_region_borders(x):
     x_num = [i for i in x if i.isnumeric()]
@@ -500,7 +508,7 @@ tr.apply(get_team_work_region, axis=1).to_csv(TEST_FOLDER + 'team_work_region.cs
 
 # ### Формирование данных по ниткам
 
-# In[909]:
+# In[54]:
 
 def change_slot_times(df):    
     min_dt = dt.datetime.fromtimestamp(slot.time_start.min())
