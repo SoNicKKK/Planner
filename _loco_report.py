@@ -23,7 +23,7 @@
 
 # ### Константы и настройки
 
-# In[ ]:
+# In[64]:
 
 report = ''
 FOLDER = 'resources/'
@@ -33,7 +33,7 @@ PRINT = True
 
 # ### Функции для экспорта в HTML
 
-# In[ ]:
+# In[65]:
 
 def add_line(line, p=PRINT):    
     global report        
@@ -85,7 +85,7 @@ def create_report(filename):
 
 # ## Загрузка и подготовка данных
 
-# In[ ]:
+# In[66]:
 
 TIME_FORMAT = '%b %d, %H:%M'
 '''
@@ -103,7 +103,7 @@ def nice_print(s, **kwargs):
         print(s[cols].to_string(index=False))
 
 
-# In[ ]:
+# In[67]:
 
 import numpy as np
 import pandas as pd
@@ -146,7 +146,7 @@ print('Время составления отчета:', time.strftime(time_form
 print('Время запуска планировщика: %s (%d)' % (time.strftime(time_format, time.localtime(current_time)), current_time))
 
 
-# In[ ]:
+# In[68]:
 
 # Мержим таблицы _plan и _info для поездов, локомотивов и бригад
 # Добавляем во все таблицы названия станций на маршруте и времена отправления/прибытия в читабельном формате
@@ -177,7 +177,7 @@ loco_plan = loco_plan.merge(loco_info, on='loco', suffixes=('', '_info'), how='l
 team_plan = team_plan.merge(team_info, on='team', suffixes=('', '_info'), how='left')
 
 
-# In[ ]:
+# In[69]:
 
 # Добавляем ссылку на бригаду в таблицу локомотивов
 # Добавляем ссылку на локомотив и бригаду в таблицу поездов
@@ -202,7 +202,7 @@ loco_tonnage['ser_name'] = loco_tonnage.series.map(loco_series.set_index('ser_id
 # 
 # Для каждого поезда берется маршрут (на нужном горизонте) и определяется, есть ли участки на этом маршруте, где к поезду не подвязан локомотив. Если есть хотя бы один такой участок, то поезд считается "плохим", если на всех участках есть подвзка, то поезд считается "хорошим". На выходе считается процент "хороших" поездов.
 
-# In[ ]:
+# In[70]:
 
 def count_assign_percent(horizon):
     mask = (train_plan.time_start < current_time + horizon)
@@ -220,7 +220,7 @@ add_line(count_assign_percent(24 * 3600))
 add_line(count_assign_percent(48 * 3600))
 
 
-# In[ ]:
+# In[71]:
 
 a = train_plan[(train_plan.time_start < current_time + 24 * 3600) & (train_plan.loco.isnull())]    .drop_duplicates('train')    .groupby(['st_from_name', 'st_to_name']).train    .count().sort_values(ascending=False)
 add_header('Направления, на которые не удалось подвязать локомотив под поезд (первые 10 по количеству поездов):')
@@ -228,35 +228,37 @@ add_line(a.head(10))
 a.to_csv('a.csv')
 
 
-# In[ ]:
+# In[72]:
 
-(st_name, st2_name) = a.index[0]
-train_cols = ['train', 'weight', 'st_from_name', 'st_to_name', 'st_dest_name', 'time_start_norm', 'time_end_norm', 'loco', 'team']
-cols = ['train', 'weight', 'st_from_name', 'st_to_name', 'st_dest_name', 'time_start_norm', 'loco', 'ser_name', 'sections']
-routes = pd.read_csv(FOLDER + 'routes.csv', converters={'st_from':str, 'st_to':str, 'train':str})
-add_info(routes)
-routes['end'] = routes.train != routes.train.shift(-1)
-train_plan['st_dest_name'] = train_plan.train.map(routes[routes.end].set_index('train').st_to_name)
-loco_info['ser_name'] = loco_info.series.map(loco_series.set_index('ser_id').ser_name)
-train_plan['ser_name'] = train_plan.loco.map(loco_info.set_index('loco').ser_name)
-train_plan['sections'] = train_plan.loco.map(loco_info.set_index('loco').sections)
-a = train_plan[(train_plan.time_start < current_time + 24 * 3600) 
-               & (train_plan.loco.isnull())
-               & (train_plan.st_dest_name.isnull() == False)
-               & (train_plan.st_from_name == st_name)].drop_duplicates('train')
-add_header('Поезда со станции %s, к которым не были подвязаны локомотивы' % st_name)
-add_line(a.sort_values('time_start')[cols])
+if not a.empty:
+    (st_name, st2_name) = a.index[0]
+    train_cols = ['train', 'weight', 'st_from_name', 'st_to_name', 'st_dest_name', 'time_start_norm', 'time_end_norm', 'loco', 'team']
+    cols = ['train', 'weight', 'st_from_name', 'st_to_name', 'st_dest_name', 'time_start_norm', 'loco', 'ser_name', 'sections']
+    routes = pd.read_csv(FOLDER + 'routes.csv', converters={'st_from':str, 'st_to':str, 'train':str})
+    add_info(routes)
+    routes['end'] = routes.train != routes.train.shift(-1)
+    train_plan['st_dest_name'] = train_plan.train.map(routes[routes.end].set_index('train').st_to_name)
+    loco_info['ser_name'] = loco_info.series.map(loco_series.set_index('ser_id').ser_name)
+    train_plan['ser_name'] = train_plan.loco.map(loco_info.set_index('loco').ser_name)
+    train_plan['sections'] = train_plan.loco.map(loco_info.set_index('loco').sections)
+    a = train_plan[(train_plan.time_start < current_time + 24 * 3600) 
+                   & (train_plan.loco.isnull())
+                   & (train_plan.st_dest_name.isnull() == False)
+                   & (train_plan.st_from_name == st_name)].drop_duplicates('train')
+    add_header('Поезда со станции %s, к которым не были подвязаны локомотивы' % st_name)
+    add_line(a.sort_values('time_start')[cols])
 
 
-# In[ ]:
+# In[73]:
 
-loco_info['is_planned'] = loco_info.loco.isin(loco_plan[loco_plan.state == 1].loco)
-loco_info['oper_time_f'] = loco_info.oper_time.apply(nice_time)
-info_cols = ['loco', 'ltype', 'oper_time_f', 'loc_name', 'tts', 'dts', 'is_planned']
-no_plan = loco_info[(loco_info.loc_name == st_name) & (loco_info.is_planned == False) & (loco_info.ltype == 1)]
-add_header('На станции %s находилось %d локомотивов, которые не были подвязаны ни к одному поезду:' 
-           % (st_name, no_plan.loco.count()))
-add_line(no_plan[info_cols])
+if not a.empty:
+    loco_info['is_planned'] = loco_info.loco.isin(loco_plan[loco_plan.state == 1].loco)
+    loco_info['oper_time_f'] = loco_info.oper_time.apply(nice_time)
+    info_cols = ['loco', 'ltype', 'oper_time_f', 'loc_name', 'tts', 'dts', 'is_planned']
+    no_plan = loco_info[(loco_info.loc_name == st_name) & (loco_info.is_planned == False) & (loco_info.ltype == 1)]
+    add_header('На станции %s находилось %d локомотивов, которые не были подвязаны ни к одному поезду:' 
+               % (st_name, no_plan.loco.count()))
+    add_line(no_plan[info_cols])
 
 
 # <a =id='regions'></a>
@@ -264,7 +266,7 @@ add_line(no_plan[info_cols])
 # 
 # Проверяется, что для локомотивов не планируется выход за пределы своих плеч (т.е. на маршруте локомотива не участков, которые не входят хотя бы в одно тяговое плечо локомотива). Исключение: если локомотив на начало планирования уже находился вне своих тяговых плеч. Для таких локомотивов проверяется, что вне своих плеч для них есть только пересылка резервом (**TODO: Вообще говоря, это может быть ошибкой: если есть поезд по направлению к своему ТП, то локомотив может его везти**).
 
-# In[ ]:
+# In[74]:
 
 add_header('Проверка наличия локомотивов только на своих тяговых плечах', h=2, p=False)
 
@@ -274,12 +276,12 @@ add_header('Проверка наличия локомотивов только 
 # 
 # Каждое тяговое плечо заточено под работу локомотивов с определенным типом тяги: электровозы или тепловозы. В тесте берутся все тяговые плечи и составляется список серий локомотивов, которые приписаны к каждому тяговому плечу. Ошибкой будет, если к одному плечу будут приписаны локомотивы как электровозных, так и тепловозных серий.
 
-# In[ ]:
+# In[75]:
 
 add_header('Проверка назначения тяговых плеч локомотивам в соответствии с сериями', h=3, p=False)
 
 
-# In[ ]:
+# In[76]:
 
 def func(df, stations, st):    
     a = links.loc[(links.st_from_name.isin(st))].st_from_name.value_counts()
@@ -307,7 +309,7 @@ pd.set_option('display.max_colwidth', 60)
 #reg_st.ix[2002119307].reg_name
 
 
-# In[ ]:
+# In[77]:
 
 def save_to_excel(df, filename=FOLDER + 'reg_ser.xlsx'):    
     df.to_excel(filename)
@@ -337,7 +339,7 @@ add_line(d.reset_index().sort_values('loco', ascending=False))
 #save_to_excel(d)
 
 
-# In[ ]:
+# In[78]:
 
 reg_ser = d.reset_index()[['region', 'ser_type']]
 
@@ -345,14 +347,14 @@ reg_ser = d.reset_index()[['region', 'ser_type']]
 # <a id='correct_reg_plan'></a>
 # ### Проверка выезда локомотивов за пределы своих тяговых плеч [ToC](#toc)
 
-# In[ ]:
+# In[79]:
 
 add_header('Проверка выезда локомотивов за пределы своих тяговых плеч', h=3, p=False)
 
 
 # #### Добавляем тяговое плечо в таблицу линков
 
-# In[ ]:
+# In[80]:
 
 stations['regions'] = stations.station.map(stations.groupby('station').loco_region.unique())
 stations_unique = stations.drop_duplicates('station').set_index('station')
@@ -366,7 +368,7 @@ links['reg_name'] = links.regs.apply(lambda x: regs[regs.loco_region.isin(x)].sh
 
 # #### Добавляем текущее тяговое плечо в каждый участок планов по локомотивам
 
-# In[ ]:
+# In[81]:
 
 loco_plan['curr_reg'] = loco_plan.link.map(links.drop_duplicates('link').set_index('link').regs)
 loco_plan['curr_reg_name'] = loco_plan.link.map(links.drop_duplicates('link').set_index('link').reg_name)
@@ -375,21 +377,21 @@ loco_info['reg_names'] = loco_info.regions_eval.apply(lambda x:                 
 loco_plan['reg_names'] = loco_plan.loco.map(loco_info.set_index('loco').reg_names)
 
 
-# In[ ]:
+# In[82]:
 
 loco_info[loco_info.regions.apply(lambda x: len(x) < 5)][['loco', 'number', 'regions', 'regions_eval']]
 
 
 # #### Вычисляем, есть у локомотива текущее тяговое плечо в списке разрешенных
 
-# In[ ]:
+# In[83]:
 
 loco_plan['ok_reg'] = loco_plan.curr_reg.combine(loco_plan.regions, np.intersect1d).apply(len) > 0
 
 
 # #### Вычисляем тяговое плечо на исходном местоположении локомотива
 
-# In[ ]:
+# In[84]:
 
 def get_current_region(row):
     if row.st_from == '-1':        
@@ -404,7 +406,7 @@ loco_info['curr_reg'] = loco_info.apply(lambda row: get_current_region(row), axi
 
 # #### Вычисляем, находится ли локомотив на своем тяговом плече на начало планирования
 
-# In[ ]:
+# In[85]:
 
 loco_info['ok_reg'] = loco_info.curr_reg.combine(loco_info.regions_eval, np.intersect1d).apply(len) > 0
 loco_plan['info_ok_reg'] = loco_plan.loco.map(loco_info.drop_duplicates('loco').set_index('loco').ok_reg)
@@ -412,7 +414,7 @@ loco_plan['info_ok_reg'] = loco_plan.loco.map(loco_info.drop_duplicates('loco').
 
 # #### Составляем список локомотивов, выезжающих за пределы своих ТП в процессе планирования
 
-# In[ ]:
+# In[86]:
 
 loco_out_of_regs = loco_plan[(loco_plan.curr_reg_name.isnull() == False) 
                              & (loco_plan.ok_reg == False) & (loco_plan.info_ok_reg == True)]
@@ -432,12 +434,12 @@ for s in states:
 # <a id='bad_regs_loco_info'></a>
 # ### Локомотивы на чужих тяговых плечах на начало планирования [ToC](#toc)
 
-# In[ ]:
+# In[87]:
 
 add_header('Локомотивы на чужих тяговых плечах на начало планирования', h=3, p=False)
 
 
-# In[ ]:
+# In[88]:
 
 cols = ['loco', 'ser_name', 'loc_name', 'reg_names']
 bad_regs_loco_info = loco_info[(loco_info.ltype == 1) & (loco_info.ok_reg == False)]
@@ -453,7 +455,7 @@ add_line(bad_regs_loco_info[cols].head(20))
 # <a =id='st_to2'></a>
 # ## Проверка пунктов проведения ТО-2 [ToC](#toc)
 
-# In[ ]:
+# In[89]:
 
 add_header('Проверка планирования ТО-2', h=2, p=False)
 
@@ -462,16 +464,17 @@ add_header('Проверка планирования ТО-2', h=2, p=False)
 # 
 # Проверяется, что ТО не запланировано ни на каких других станций, кроме тех, которые указаны в сообщениях `service_station`. Для каждой станции считается, сколько вообще случаев ТО запланировано (преимущественно ТО должно проводиться на границах тяговых плеч).
 
-# In[ ]:
+# In[90]:
 
 service = pd.read_csv(FOLDER + 'service_station.csv', dtype={'station':str})
 service['st_name'] = service.station.map(st_names.name)
 add_header('Пункты проведения ТО-2 во входных данных:')
 add_line(service.groupby('st_name').duration.median())
-add_line('\nМедианное время проведения ТО-2: %.2f часа' % (service.groupby('st_name').duration.median().median() / 3600))
+add_line('\nМедианное время проведения ТО-2 во входных данных: %.2f часа' 
+         % (service.groupby('st_name').duration.median().median() / 3600))
 
 
-# In[ ]:
+# In[91]:
 
 loco_plan['tt'] = loco_plan.time_end - loco_plan.time_start
 plan_to = loco_plan[loco_plan.state == 4][['loco', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm', 'tt']]
@@ -496,7 +499,7 @@ else:
 # 
 # Также выводятся локомотивы, у которых на начало планирования до ТО оставалось меньше 10 часов и для которых ТО не было запланировано.
 
-# In[ ]:
+# In[92]:
 
 to = loco_plan[(loco_plan.state == 4) & (loco_plan.time_start < current_time + 24 * 3600)]
 to_n = loco_plan[(loco_plan.state == 4) & (loco_plan.time_start < current_time + 24 * 3600)].loco.count()
@@ -526,14 +529,14 @@ else:
 # 
 # На каждом участке на маршруте поезда из сообщений loco_tonnage извлекается весовая норма, соответствующая участку и подвязанному локомотиву (серия + секционность). Проверяется, что вес поезда не превышает эту норму. Если для участка, серии и секции задано несколько норм, то берется максимальная.
 
-# In[ ]:
+# In[93]:
 
 add_header('Проверка подвязки на соответствие весовым нормам', h=2, p=False)
 
 
 # ### Маска времени
 
-# In[ ]:
+# In[94]:
 
 #Ниже надо раскомментировать соответствующую строчку для нужного анализа
 
@@ -546,7 +549,7 @@ def time_mask(df):
 
 # ### Проверка соответствия результатов планирования справочнику весовых норм
 
-# In[ ]:
+# In[95]:
 
 loco_plan['ser_name'] = loco_plan.series.map(loco_series.set_index('ser_id').ser_name)
 loco_tonnage = pd.read_csv(FOLDER + 'loco_tonnage.csv', converters={'st_from':str, 'st_to':str})
@@ -572,35 +575,38 @@ add_header('\nВсего %d подвязок локомотивов к поез�
 add_line(overweight_no_joint.sort_values('overweight', ascending=False).head(10)[cols])
 
 
-# In[ ]:
+# In[96]:
 
-sns.set(style='whitegrid', context='talk')
-sns.set_color_codes('dark')
-fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(20,7))
-if not overweight_plan.empty:
-    sns.distplot(overweight_plan.train_weight, hist=False, color='b', 
-                 kde_kws={'shade':True, 'label':'Вес поезда'}, ax=ax[0])
-    sns.distplot(overweight_plan.overweight, hist=False, color='g', 
-                 kde_kws={'shade':True, 'label':'Превышение весовой нормы'}, ax=ax[0])
-    title = 'Для всех поездов'
-    ax[0].set(title=title, xlabel='Вес поезда')
-    ax[0].legend(frameon=True)
-if not overweight_no_joint.empty:
-    sns.distplot(overweight_no_joint.train_weight, hist=False, color='b', 
-                 kde_kws={'shade':True, 'label':'Вес поезда'}, ax=ax[1])
-    sns.distplot(overweight_no_joint.overweight, hist=False, color='g', 
-                 kde_kws={'shade':True, 'label':'Превышение весовой нормы'}, ax=ax[1])
-    title_nj = 'Без сдвоенных поезов'
-    ax[1].set(title=title_nj, xlabel='Вес поезда')
-    ax[1].legend(frameon=True)
-plt.suptitle('Распределение весов поездов, для которых наблюдается нарушение весовых норм', fontsize=20)
-sns.despine()
-filename = 'weight_error.png'
-fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
-add_image(filename)
+# Здесь рисуется картинка, на которой показывается распределение превышений весовых норм. Можно как-нибудь раскомментировать,
+# но сейчас картинкой никто не пользуется.
+
+# sns.set(style='whitegrid', context='talk')
+# sns.set_color_codes('dark')
+# fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(20,7))
+# if not overweight_plan.empty:
+#     sns.distplot(overweight_plan.train_weight, hist=False, color='b', 
+#                  kde_kws={'shade':True, 'label':'Вес поезда'}, ax=ax[0])
+#     sns.distplot(overweight_plan.overweight, hist=False, color='g', 
+#                  kde_kws={'shade':True, 'label':'Превышение весовой нормы'}, ax=ax[0])
+#     title = 'Для всех поездов'
+#     ax[0].set(title=title, xlabel='Вес поезда')
+#     ax[0].legend(frameon=True)
+# if not overweight_no_joint.empty:
+#     sns.distplot(overweight_no_joint.train_weight, hist=False, color='b', 
+#                  kde_kws={'shade':True, 'label':'Вес поезда'}, ax=ax[1])
+#     sns.distplot(overweight_no_joint.overweight, hist=False, color='g', 
+#                  kde_kws={'shade':True, 'label':'Превышение весовой нормы'}, ax=ax[1])
+#     title_nj = 'Без сдвоенных поезов'
+#     ax[1].set(title=title_nj, xlabel='Вес поезда')
+#     ax[1].legend(frameon=True)
+# plt.suptitle('Распределение весов поездов, для которых наблюдается нарушение весовых норм', fontsize=20)
+# sns.despine()
+# filename = 'weight_error.png'
+# fig.savefig(REPORT_FOLDER + filename, bbox_inches='tight')
+# add_image(filename)
 
 
-# In[ ]:
+# In[97]:
 
 add_header('Распределение нарушений весовых норм по участкам (первые 5):')
 a = overweight_no_joint.link_name.value_counts()
@@ -623,12 +629,12 @@ add_line(overweight_ser.reset_index())
 # 
 # Станции обязательной смены локомотивов перечислены в списке `st_list`. В нем же для каждой станции смены указаны другие станции, которые должны присутствовать в маршруте поезда для того, чтобы на этой станции была запланирована смена. Например, для станции Карымская второй станцией указана Урульга: это значит, что смена локомотива в Карымской будет обязательна только в том случае, если в маршруте поезда есть Урульга. Если же четный поезд уходит с Карымской на Борзю (станции Урульга нет в маршруте), то смена локомотива не производится.
 
-# In[ ]:
+# In[98]:
 
 add_header('Проверка смены локомотивов на станциях обязательной смены', h=2, p=False)
 
 
-# In[ ]:
+# In[99]:
 
 hor = 24 * 3600
 cols = ['train', 'st_from_name', 'st_to_name', 'time_start_norm', 'loco', 'train_start', 'loco_start']
@@ -640,7 +646,7 @@ add_header('Станции смены локомотивов (показаны �
 add_line(loco_changes.st_from_name.value_counts().head(10))
 
 
-# In[ ]:
+# In[100]:
 
 # Список станций (первый столбец), на которых локомотивы меняются всегда,
 # если в машруте поезда есть любая из проверочных станций (второй столбец)
@@ -665,7 +671,7 @@ change_fails = train_plan.loc[(train_plan.time_start < current_time + hor)
                               & (train_plan.loco_start == False)
                               & (train_plan.st_from_name.isin(df_list.st))
                               & (train_plan.in_route == True)][cols].drop_duplicates().dropna(subset=['loco'])
-add_header('\nВсего %d поездов, у которых должна быть смена локомотивов на станциях обязательной смены, но она не запланирована:' 
+add_header('\nВсего %d поездов, у которых должна быть смена локомотивов на станциях обязательной смены, но не запланирована:' 
       % len(change_fails))
 add_line(change_fails.sort_values(['st_to_name', 'time_start_norm']))
 
@@ -681,7 +687,7 @@ add_line(change_fails.sort_values(['st_to_name', 'time_start_norm']))
 # 4. Отдельно считаются количества локомотивов резервом в четном направлении отдельно по направлениям.
 # 5. Считаются времена хода для локомотивов резервом. Они не должны (или должны, но на небольшую величину - 2-3 часа) превышать 15 часов (чтобы избежать длинных, ненадежных пересылок резервом).
 
-# In[ ]:
+# In[101]:
 
 add_header('Анализ локомотивов резервом', h=2, p=False)
 hor = 24 * 3600
@@ -691,7 +697,7 @@ add_line('Анализируемый горизонт отправления: %.
 # <a =id='res_nums'></a>
 # ### Проверка диапазона номеров для локомотивов резервом [ToC](#toc)
 
-# In[ ]:
+# In[102]:
 
 train_plan.columns
 train_plan['train_type'] = train_plan.train.apply(lambda x: int(str(x)[0]))
@@ -703,7 +709,7 @@ add_line('Диапазон номеров поездов для локомоти
 # <a =id='res_amount'></a>
 # ### Анализ количества отправлений локомотивов резервом по направлениям [ToC](#toc)
 
-# In[ ]:
+# In[103]:
 
 loco_mask = loco_plan.time_start < current_time + hor
 loco_cols = ['loco', 'st_from_name', 'st_to_name', 'time_start', 'time_end', 'time_start_norm', 'time_end_norm',
@@ -732,7 +738,7 @@ add_line(loco_res_trips_hor.groupby('st_from_name').st_to_name_end.value_counts(
 # <a =id='res_before'></a>
 # ### Локомотивы резервом до начала планирования [ToC](#toc)
 
-# In[ ]:
+# In[104]:
 
 add_info(links)
 add_line('Время начала планирования: %s (%d)' % (time.strftime(time_format, time.localtime(current_time)), current_time))
@@ -751,7 +757,7 @@ if not res_before_ct.empty:
 # <a =id='res_even'></a>
 # ### Локомотивы резервом в четном направлении [ToC](#toc)
 
-# In[ ]:
+# In[105]:
 
 cols = ['loco', 'st_from_name', 'st_to_name_end', 'time_start', 'time_start_norm', 'dir', 'train']
 even_res = loco_res_trips.loc[loco_res_trips.dir == 0, cols]
@@ -772,7 +778,7 @@ add_line(most_even_res)
 # [В начало](#toc)
 # ### Проверка времени хода для локомотивов резервом
 
-# In[ ]:
+# In[106]:
 
 def get_regions(x):
     return list(a[a.apply(lambda y: (x[0] in y) & (x[1] in y))].index)
@@ -793,7 +799,7 @@ add_header('Из них %d НЕ являются возвратом на сво�
            % res_trips_long_no_back.loco.count())
 add_line(res_trips_long_no_back.head(10)[cols])
 if not res_trips_long_no_back.empty:
-    loco_id = res_trips_long_no_back.iloc[2].loco
+    loco_id = res_trips_long_no_back.iloc[0].loco
     plan_cols = ['loco', 'ser_name', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm', 'train', 'team']
     with pd.option_context('display.max_colwidth', 20):
         add_line(loco_plan[loco_plan.loco == loco_id][plan_cols])
@@ -809,17 +815,45 @@ add_header('Среднее время хода для таких локомот�
 # 5. Смена локомотивов происходит на станции Горелый (для маршрутов типа Карымская--Беркакит или Таксимо--Карымская, например). Хотя поезд правильнее заводить на Сковородино и менять локомотив там. Проблема в том, что тогда на маршруте поезда получится петля типа "Бамовская -- Горелый -- Сковородино -- Горелый -- Штурм". Текущий алгоритм построения маршрутов не сможет сгенерировать такой маршрут у поезда. Видимо, нужна более продвинутая проверка на приоритетные станции при смене локомотивов и корректировка маршрута поезда. Сложная проблема, надо думать. Пока отложено до 10.05.2016.
 # 6. Узел Комсомольска-на-Амуре сложный, надо разбираться. Возможно, надо будет вводить дополнительный участок планирования КнА II - КнА-Сорт. Тоже сложная проблема, тоже пока отложено до 10.05.2016.
 
+# ## Проверка скачков по станциям
+
+# In[107]:
+
+add_header('Проверка скачков по станциям', h=2, p=False)
+
+
+# In[115]:
+
+loco_last_track = loco_plan.sort_values(['loco', 'time_start']).drop_duplicates('loco', keep='last').set_index('loco')
+loco_plan['loco_end'] = loco_plan.loco != loco_plan.loco.shift(-1)
+loco_plan['next_station'] = loco_plan.st_from_name.shift(-1)
+cols = ['loco', 'st_from_name', 'st_to_name', 'time_end_norm', 'next_station']
+st_leaps = loco_plan[(loco_plan.st_to_name != loco_plan.next_station) 
+                  & (loco_plan.loco_end == False)
+                  & ((loco_plan.st_to_name.notnull()) | (loco_plan.next_station.notnull()))].sort_values('time_end')[cols]
+if st_leaps.empty:
+    add_header('Не найдено локомотивов со скачками по станциям в плане')
+else:
+    add_header('Всего %d локомотивов со скачками по станциям в плане. Примеры:' % st_leaps.loco.count())
+    add_line(st_leaps.head(10)[cols])
+    loco_id = st_leaps.iloc[0].loco
+    add_line('')
+    cols = ['loco', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm', 'state', 'train']
+    add_header('Пример плана по локомотиву:')
+    add_line(loco_plan[loco_plan.loco == loco_id][cols])
+
+
 # <a id='time_leaps'></a>
 # ## Проверка скачков по времени назад [ToC](#toc)
 # 
 # На запланированном маршруте локомотивов не должно быть случаев, когда время отправления с какой-то станции меньше времени прибытия на нее, а время прибытия на конечную станцию участка не больше времени отправления с начальной станции участка.
 
-# In[ ]:
+# In[109]:
 
 add_header('Проверка скачков по времени назад', h=2, p=False)
 
 
-# In[ ]:
+# In[114]:
 
 loco_plan['next_time_start'] = loco_plan.time_start.shift(-1)
 loco_plan['next_time_start_norm'] = loco_plan.time_start_norm.shift(-1)
@@ -831,12 +865,16 @@ if leaps.empty:
 else:
     add_header('Всего %d локомотивов со скачками по времени назад в плане. Примеры:' % leaps.loco.count())
     add_line(leaps.head(10)[cols])
+    loco_id = leaps.iloc[0].loco
+    add_line('')
+    cols = ['loco', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm', 'state', 'train']
+    add_line(loco_plan[loco_plan.loco == loco_id][cols])
 
 
 # <a id='report'></a>
 # ### Экспорт результатов в HTML [ToC](#toc)
 
-# In[ ]:
+# In[111]:
 
 filename = REPORT_FOLDER + 'loco_report_' + time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time())) + '.html'
 create_report(filename)

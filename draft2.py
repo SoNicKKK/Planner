@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # In[142]:
@@ -10,7 +10,7 @@ import numpy as np
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 sns.set(style='whitegrid', context='notebook')
 sns.set_color_codes('dark')
 
@@ -184,8 +184,8 @@ plt.legend()
 
 # In[5]:
 
-get_ipython().magic('run read.py')
-get_ipython().magic('run common.py')
+#get_ipython().magic('run read.py')
+#get_ipython().magic('run common.py')
 
 
 # In[15]:
@@ -314,7 +314,7 @@ print(sum(util0[assign[assign_ind]]))
 
 # In[438]:
 
-get_ipython().magic('run common.py')
+#get_ipython().magic('run common.py')
 
 
 # In[565]:
@@ -439,7 +439,7 @@ plt.scatter(df_team.ts_norm, [1.0] * len(df_team.ts_norm), s=50, c='b')
 
 # In[50]:
 
-get_ipython().magic('run common.py')
+#get_ipython().magic('run common.py')
 
 
 # In[57]:
@@ -486,9 +486,32 @@ team_plan[team_plan.team == '200200136435'][cols]
 loco_plan[loco_plan.loco == '200200249699  '][['loco', 'st_from_name', 'st_to_name', 'time_start_norm', 'train']]
 
 
-# In[44]:
+# In[1]:
 
-get_ipython().magic('run common.py')
+#get_ipython().magic('run common.py')
+
+
+# In[18]:
+
+print(nice_time(current_time))
+cols = ['train', 'ind434', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm']
+train_plan[(train_plan.st_to_name == 'МАРИИНСК')
+           & (train_plan.time_end <= current_time + 24 * 3600)].sort_values('time_end')[cols]
+
+train_plan[train_plan.ind434 == '9859-280-2305'][cols]
+
+
+# In[24]:
+
+cols = ['loco', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm', 'train', 'state']
+loco_plan[loco_plan.train == '200252472362'][cols]
+loco_plan[loco_plan.loco == '200200087612'][cols]
+
+
+# In[23]:
+
+cols = ['team', 'st_from_name', 'st_to_name', 'time_start_norm', 'time_end_norm', 'loco', 'state']
+team_plan[team_plan.loco == '200200087612'][cols]
 
 
 # In[45]:

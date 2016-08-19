@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -35,7 +35,7 @@
 report = ''               # здесь будет храниться весь html-код отчета
 FOLDER = 'resources/'     # папка с csv-файлами с данными
 REPORT_FOLDER = 'report/' # папка для отчетов
-PRINT = True              # выводить ли все таблицы из отчета на печать здесь в блокноте
+PRINT = False              # выводить ли все таблицы из отчета на печать здесь в блокноте
 
 
 # In[ ]:
@@ -118,7 +118,7 @@ from ast import literal_eval
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 plt.style.use('fivethirtyeight')
 plt.rc('font', family='Times New Roman')
 
@@ -567,6 +567,7 @@ team_cols = ['team', 'st_from_name', 'st_to_name', 'next_st', 'time_start_f', 't
 team_plan['is_end'] = team_plan.team != team_plan.team.shift(-1)
 team_plan['next_st'] = team_plan.st_from_name.shift(-1)
 team_leaps = team_plan.loc[(team_plan.is_end == False) 
+                           & (team_plan.state != 2)
                            & (team_plan.st_to_name != team_plan.next_st)
                            & (team_plan.st_to_name.notnull())
                            & (team_plan.next_st.notnull()), team_cols]
