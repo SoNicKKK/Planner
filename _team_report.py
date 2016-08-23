@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -35,7 +35,7 @@
 report = ''               # здесь будет храниться весь html-код отчета
 FOLDER = 'resources/'     # папка с csv-файлами с данными
 REPORT_FOLDER = 'report/' # папка для отчетов
-PRINT = True              # выводить ли все таблицы из отчета на печать здесь в блокноте
+PRINT = False              # выводить ли все таблицы из отчета на печать здесь в блокноте
 
 
 # In[ ]:
@@ -118,7 +118,7 @@ from ast import literal_eval
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 plt.style.use('fivethirtyeight')
 plt.rc('font', family='Times New Roman')
 
@@ -458,6 +458,11 @@ team_links['time_f'] = team_links.tr_depot.map(team_region.drop_duplicates('tr_d
 team_links['time_b'] = team_links.tr_depot.map(team_region.drop_duplicates('tr_depot').set_index('tr_depot').time_b)
 team_links['time_wr'] = team_links.tr_depot.map(team_region.drop_duplicates('tr_depot').set_index('tr_depot').time_wr)
 #team_links.head()
+
+
+# In[1]:
+
+time_limit = team_links[['team', 'time_f', 'time_b', 'time_wr']]
 
 
 # #### Вычисляем переработки, предварительно удалив выбросы

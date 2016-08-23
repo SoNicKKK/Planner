@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -28,7 +28,7 @@
 report = ''
 FOLDER = 'resources/'
 REPORT_FOLDER = 'report/'
-PRINT = True
+PRINT = False
 
 
 # ### Функции для экспорта в HTML
@@ -113,7 +113,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from IPython import get_ipython
 
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 plt.style.use('fivethirtyeight')
 plt.rc('font', family='Times New Roman')
 

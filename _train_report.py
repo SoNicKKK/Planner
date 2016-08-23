@@ -1,4 +1,4 @@
-
+﻿
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -29,7 +29,7 @@
 report = ''
 FOLDER = 'resources/'
 REPORT_FOLDER = 'report/'
-PRINT = True
+PRINT = False
 
 
 # In[ ]:
@@ -91,7 +91,7 @@ import time, datetime
 from ast import literal_eval
 import matplotlib.pyplot as plt
 import seaborn as sns
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 
 pd.set_option('max_rows', 50)
 
