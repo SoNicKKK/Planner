@@ -1,9 +1,9 @@
-
+﻿
 # coding: utf-8
 
 # In[2]:
 
-get_ipython().magic('run common.py')
+#get_ipython().magic('run common.py')
 
 
 # <a id='toc'></a>
@@ -58,7 +58,7 @@ get_ipython().magic('run common.py')
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-get_ipython().magic('matplotlib inline')
+#get_ipython().magic('matplotlib inline')
 
 x0 = 16
 x = np.linspace(0, 36, 1000)
@@ -632,7 +632,7 @@ def allocate(df_init, slot_col, init_trains_col, trains_num):
 
 import datetime as dt
 
-get_ipython().magic('run common.py')
+#get_ipython().magic('run common.py')
 slot = pd.read_csv(FOLDER + 'slot.csv', dtype={'st_from':str, 'st_to':str})
 add_info(slot)
 st1 = 'ИРКУТСК-СОРТИРОВОЧНЫЙ'

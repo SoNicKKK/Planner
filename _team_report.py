@@ -1,4 +1,4 @@
-﻿
+
 # coding: utf-8
 
 # <a id='toc'></a>
@@ -35,7 +35,7 @@
 report = ''               # здесь будет храниться весь html-код отчета
 FOLDER = 'resources/'     # папка с csv-файлами с данными
 REPORT_FOLDER = 'report/' # папка для отчетов
-PRINT = False              # выводить ли все таблицы из отчета на печать здесь в блокноте
+PRINT = True              # выводить ли все таблицы из отчета на печать здесь в блокноте
 
 
 # In[ ]:
@@ -118,7 +118,7 @@ from ast import literal_eval
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-#get_ipython().magic('matplotlib inline')
+get_ipython().magic('matplotlib inline')
 plt.style.use('fivethirtyeight')
 plt.rc('font', family='Times New Roman')
 
@@ -460,12 +460,6 @@ team_links['time_wr'] = team_links.tr_depot.map(team_region.drop_duplicates('tr_
 #team_links.head()
 
 
-# In[ ]:
-
-time_limit = team_links[['team', 'time_f', 'time_b', 'time_wr']]
-time_limit.head()
-
-
 # #### Вычисляем переработки, предварительно удалив выбросы
 
 # In[ ]:
@@ -487,7 +481,6 @@ team_trips['time_limit'] = team_trips.team.map(time_limit.set_index('team').time
 team_trips['time_limit_no_rest'] = team_trips.team.map(time_limit.set_index('team').time_wr)
 team_trips.time_limit.fillna(WORK_TIME_LIMIT * 3600, inplace=True)
 team_trips.time_limit_no_rest.fillna(WORK_TIME_LIMIT * 3600, inplace=True)
-team_trips[['team', 'st_from_name', 'st_to_name', 'curr_presence_norm', 'time_start_f', 'time_end_f', 'time_limit', 'time_limit_no_rest']].head()
 
 
 # In[ ]:
@@ -749,13 +742,12 @@ add_image(filename)
 
 # In[ ]:
 
-team_plan['loco_time'] = list(zip(team_plan.loco, team_plan.time_start))
-loco_plan['loco_time'] = list(zip(loco_plan.loco, loco_plan.time_start))
-team_plan['train'] = team_plan.loco_time.map(loco_plan.drop_duplicates('loco_time').set_index('loco_time').train)
-#print(team_plan[team_plan.team == '777700000270']\
-#      [['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 
-#        'state', 'loco', 'train', 'time']].to_string(index=False))
-time.ctime(1463065200)
+# team_plan['loco_time'] = list(zip(team_plan.loco, team_plan.time_start))
+# loco_plan['loco_time'] = list(zip(loco_plan.loco, loco_plan.time_start))
+# team_plan['train'] = team_plan.loco_time.map(loco_plan.drop_duplicates('loco_time').set_index('loco_time').train)
+# #print(team_plan[team_plan.team == '777700000270']\
+# #      [['team', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f', 
+# #        'state', 'loco', 'train', 'time']].to_string(index=False))
 
 
 # ## Проверка подвязки бригад по Иркутску
@@ -1297,20 +1289,6 @@ else:
     add_line(bad_prev[cols].head(10))
 
 
-# In[ ]:
-
-print(nice_time(current_time))
-team_info['depot_name'] = team_info.depot.map(st_names.name)
-team_info['prev_ready_time'] = team_info.team.map(prev_team.drop_duplicates('team').set_index('team').prev_ready_time)
-team_info['prev_ready_time_f'] = team_info.prev_ready_time.apply(nice_time)
-team_info['oper_time_f'] = team_info.oper_time.apply(nice_time)
-team_info['plan_start_time'] = team_info.team.map(team_plan[team_plan.state.isin([0, 1])]                                                  .drop_duplicates('team').set_index('team').time_start)
-team_info['plan_start_time_f'] = team_info['plan_start_time'].apply(nice_time)
-cols = ['team', 'number', 'oper_time_f', 'depot_time_f', 'state', 'prev_ready_time_f', 'plan_start_time_f']
-team_info[(team_info.uth == 1) & (team_info.state == '3')
-          & (team_info.depot_name == 'ИРКУТСК-СОРТИРОВОЧНЫЙ')].sort_values('oper_time')[cols]
-
-
 # [ToC](#toc)
 # ## Проверка возврата правильных времен явок у бригад
 # 
@@ -1514,6 +1492,13 @@ team_info['plan_start_time_f'] = team_info['plan_start_time'].apply(nice_time)
 
 # In[ ]:
 
+team_info.columns
+team_info['prev_ready_time'] = team_info.team.map(prev_team.set_index('team').prev_ready_time)
+team_info['prev_ready_time_f'] = team_info.prev_ready_time.apply(nice_time)
+
+
+# In[ ]:
+
 irk_uth = team_info[(team_info.depot_name == st_name) & (team_info.uth == 1)]
 add_header('Все УТХ-бригады из депо %s (%d):' % (st_name, irk_uth.team.count()))
 cols = ['team', 'depot_name', 'uth', 'state', 'is_assign', 'presence_norm', 'plan_start_time_f', 'prev_ready_time_f']
@@ -1579,25 +1564,6 @@ no_team = loco_plan[(loco_plan.team_start == True) & (loco_plan.st_from_name == 
 add_header('Случаи отправки локомотива со станции %s без бригады или с фейковой бригадой (всего %d):'
           % (st_name, no_team.loco.count()))
 add_line(no_team[cols])
-
-
-# In[ ]:
-
-linked = pd.read_csv(FOLDER + 'linked_stations.csv', dtype={'main':str, 'linked':str})
-linked['main_name'] = linked.main.map(st_names.name)
-linked['linked_name'] = linked.linked.map(st_names.name)
-linked.dropna(inplace=True)
-
-
-# In[ ]:
-
-slot_pass = pd.read_csv(FOLDER + 'slot_pass.csv', dtype={'st_from':str, 'st_to':str})
-add_info(slot_pass)
-cols = ['slot', 'st_from_name', 'st_to_name', 'time_start_f', 'time_end_f']
-slot_pass[(slot_pass.st_from_name == 'ИРКУТСК-СОРТИРОВОЧНЫЙ') & (slot_pass.st_to_name == 'ВОЕННЫЙ ГОРОДОК')
-         & (slot_pass.time_start >= current_time) & (slot_pass.time_start < current_time + 24 * 3600)]\
-        .sort_values('time_start')[cols]
-slot_pass[slot_pass.slot == 200253805879][cols]
 
 
 # ### Для бригад из депо, по которым нет УТХ-бригад, не должно быть большого сдвига времени явки
